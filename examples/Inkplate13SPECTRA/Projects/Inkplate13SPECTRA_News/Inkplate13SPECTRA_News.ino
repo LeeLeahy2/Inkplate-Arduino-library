@@ -41,22 +41,11 @@
  **************************************************/
 
 // Ensure the correct board is selected in the Arduino IDE
-/*#ifndef ARDUINO_INKPLATE13SPECTRA
+#ifndef ARDUINO_INKPLATE13SPECTRA
 #error "Wrong board selection for this example, please select Soldered Inkplate 6COLOR in the boards menu."
-#endif*/
+#endif
 
-// ---------- CHANGE HERE -------------
-// Adjust your timezone (e.g., 2 means UTC+2)
-int timeZone = 2;
-
-// WiFi credentials (replace with your WiFi network details)
-char ssid[] = "your ssid";       // Replace with your WiFi SSID
-char pass[] = "your pasword";   // Replace with your WiFi password
-
-// News API key (get one from https://newsapi.org/)
-char api_key_news[] = "your news api key"; // Replace with your News API key
-// ------------------------------------
-
+#include "secrets.h"
 
 // Include necessary libraries
 #include "Inkplate.h"
