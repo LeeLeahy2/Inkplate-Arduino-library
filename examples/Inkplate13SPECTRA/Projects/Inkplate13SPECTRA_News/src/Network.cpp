@@ -45,7 +45,7 @@ void NetworkTEST::begin()
         Serial.print(F("."));
     }
 
-    Serial.println(F("\nWiFi connected."));
+    Serial.println(F("\r\nWiFi connected."));
 }
 
 struct news* NetworkTEST::getData(Inkplate &inkplate)
@@ -110,7 +110,7 @@ struct news* NetworkTEST::getData(Inkplate &inkplate)
         if (doc["status"])
         {
             int n = doc["articles"].size();
-            Serial.printf("Number of articles: %d\n", n);
+            Serial.printf("Number of articles: %d\r\n", n);
 
             // Allocate memory for the news array
             ent = (struct news *)ps_malloc(n * sizeof(struct news));

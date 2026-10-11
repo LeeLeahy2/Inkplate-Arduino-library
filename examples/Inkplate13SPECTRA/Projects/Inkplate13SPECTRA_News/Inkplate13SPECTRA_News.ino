@@ -201,9 +201,9 @@ void drawNews(struct news *entities)
 
     for (int i = 0; i < maxBoxes && entities[i].title != nullptr && entities[i].description != nullptr; i++)
     {
-        Serial.printf("Drawing news item %d...\n", i + 1);
-        Serial.printf("Title: %s\n", entities[i].title);
-        Serial.printf("Description: %s\n", entities[i].description);
+        Serial.printf("Drawing news item %d...\r\n", i + 1);
+        Serial.printf("Title: %s\r\n", entities[i].title);
+        Serial.printf("Description: %s\r\n", entities[i].description);
 
         int y0 = startY + i * (boxHeight + boxSpacing);
         int y1 = y0 + boxHeight;
@@ -229,7 +229,7 @@ void setTime()
     }
     gmtime_r(&nowSec, &timeInfo);
     Serial.print(F("Current time: "));
-    Serial.print(asctime(&timeInfo));
+    Serial.println(asctime(&timeInfo));
 }
 
 void loop()
