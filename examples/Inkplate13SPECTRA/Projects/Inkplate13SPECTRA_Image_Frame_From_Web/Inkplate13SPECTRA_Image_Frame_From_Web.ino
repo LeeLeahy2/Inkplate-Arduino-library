@@ -86,6 +86,9 @@ void setup()
     // Activate wakeup timer
     esp_sleep_enable_timer_wakeup(15ll * 60 * 1000 * 1000);
 
+    // Enable wakup from deep sleep on gpio 18 with pushbutton
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_18, 0);
+
     // Start deep sleep (this function does not return). Program stops here.
     esp_deep_sleep_start();
 }
