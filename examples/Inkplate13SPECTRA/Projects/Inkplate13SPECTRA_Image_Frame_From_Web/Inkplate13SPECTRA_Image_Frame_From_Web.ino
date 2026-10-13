@@ -48,7 +48,7 @@ void setup()
     display.setTextColor(INKPLATE_BLACK);
 
     // Join wifi
-    display.connectWiFi(ssid, password);
+    display.connectWiFiMulti(WIFI_SSID_ENTRIES, ssid, password);
     Serial.println("joined wifi");
     char url[256];  // Buffer that will hold the final resolved image url
 
