@@ -60,9 +60,29 @@ void setup()
     imageUrl(url);
     Serial.println(url);
 
-    // Download and draw the JPEG image directly from the web
-    // Function returns 1 on success and 0 on failure
-    Serial.println(display.image.drawJpegFromWeb(url, 0, 0, true, false));
+    // Locate the image extension
+    char * extension = &url[strlen(url) -1];
+    while (*extension != '.')
+        extension -= 1;
+
+    // Select routine based upon the image extension
+    if (strcmp(extension, ".bmp") == 0)
+    {
+        Serial.println("Loading .BMP image");
+        Serial.println(display.image.drawBitmapFromWeb(url, 0, 0, true, false));
+    }
+    else if ((strcmp(extension, ".jpg") == 0) || (strcmp(extension, ".jpeg") == 0))
+    {
+        // Download and draw the JPEG image directly from the web
+        // Function returns 1 on success and 0 on failure
+        Serial.println("Loading .JPG image");
+        Serial.println(display.image.drawJpegFromWeb(url, 0, 0, true, false));
+    }
+    else if (strcmp(extension, ".png") == 0)
+    {
+        Serial.println("Loading .PNG image");
+        Serial.println(display.image.drawPngFromWeb(url, 0, 0, true, false));
+    }
     display.display();
 
     Serial.println("Going to sleep");
@@ -104,7 +124,7 @@ void imageUrl(char *out)
 
     // Perform HTTP GET request
     int code = http.GET();
-    Serial.printf("HTTP code: %d\n", code);
+    Serial.printf("HTTP code: %d\r\n", code);
 
     // Try header() first (works when collectHeaders is used)
     String loc = http.header("Location");
