@@ -16,6 +16,9 @@
 
 #include "NetworkController.h"
 
+WiFiMulti wifiMulti;
+bool usingWifiMulti;
+
 /**
  * @brief       Connects Inkplate to a provided WiFi network.
  *
@@ -113,9 +116,6 @@ bool NetworkController::connectWiFi(const char *ssid, const char *pass, int time
 bool NetworkController::connectWiFiMulti(int numNetworks, const char **ssids, const char **passwords, int timeout,
                                          bool printToSerial)
 {
-    // Create the WiFiMulti object
-    WiFiMulti wifiMulti;
-
     // Init WiFi
     WiFi.mode(WIFI_MODE_STA);
 
@@ -148,6 +148,8 @@ bool NetworkController::connectWiFiMulti(int numNetworks, const char **ssids, co
         }
     }
 
+    usingWifiMulti = true;
+
     // Connect to strongest available defined network
     if (wifiMulti.run(timeout * 1000) != WL_CONNECTED)
     {
@@ -162,6 +164,8 @@ bool NetworkController::connectWiFiMulti(int numNetworks, const char **ssids, co
     {
         Serial.print("Successfully connected to WiFi network ");
         Serial.print(WiFi.SSID());
+        Serial.print(", ");
+        Serial.print(WiFi.STA.localIP().toString().c_str());
         Serial.println("!");
     }
 
@@ -183,7 +187,8 @@ void NetworkController::disconnect()
  */
 bool NetworkController::isConnected()
 {
-    return WiFi.status() == WL_CONNECTED;
+    // Attempt to connect to WiFi network
+    return (usingWifiMulti ? wifiMulti.run() : WiFi.status()) == WL_CONNECTED;
 }
 
 /**
