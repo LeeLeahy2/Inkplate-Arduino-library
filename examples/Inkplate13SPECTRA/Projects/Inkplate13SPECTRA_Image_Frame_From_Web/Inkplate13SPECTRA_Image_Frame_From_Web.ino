@@ -36,14 +36,10 @@
 #endif
 
 #include "Inkplate.h"
+#include "secrets.h"
 
 // Create Inkplate display object
 Inkplate display;
-
-//WiFi credentials
-const char *ssid = "";     // Your WiFi SSID
-const char *password = ""; // Your WiFi password
-
 
 void setup()
 {
@@ -56,7 +52,7 @@ void setup()
     Serial.println("joined wifi");
     char url[256];  // Buffer that will hold the final resolved image url
 
-    // Get the final image URL (resolve HTTP redirect) 
+    // Get the final image URL (resolve HTTP redirect)
     imageUrl(url);
     Serial.println(url);
 
@@ -104,9 +100,6 @@ void loop()
 void imageUrl(char *out)
 {
     HTTPClient http;
-
-    // Starting URL that always redirects to a random image
-    const char *startUrl = "http://loremflickr.com/1600/1200";
 
     // Tell HTTPClient to store the "Location" header sowe can read it later
     const char* keys[] = {"Location"};
