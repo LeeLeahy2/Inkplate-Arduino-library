@@ -125,7 +125,7 @@ endif
 #---------
 
 # Files
-BIN_FILE=$(BIN_PATH)$(SKETCH).ino.bin
+BIN_FILE=$(BIN_PATH)$(SKETCH).ino.merged.bin
 
 ##########
 # Buid all the sources - must be first
@@ -200,10 +200,7 @@ upload:	$(BIN_FILE)
 		--flash_freq 80m \
 		--flash_size detect \
 		--compress \
-		      0   $(BOOT_LOADER_PATH)$(SKETCH).ino.bootloader.bin \
-		 0x8000   $(BOOT_LOADER_PATH)$(SKETCH).ino.partitions.bin \
-		 0xe000   $(BOOT_LOADER_PATH)boot_app0.bin \
-		0x10000   $<
+		      0   $<
 	$(TERMINAL_APP) -D $(TERMINAL_PORT) $(TERMINAL_PARAMS)
 
 ##########
