@@ -100,6 +100,7 @@ EXAMPLE_PATH=../
 ARDUINO_PATH=$(USER_DIRECTORY_PATH)Arduino/
 ARDUINO_LIBRARY_PATH=$(ARDUINO_PATH)libraries/
 BUILD_PATH=build/
+BOOT_APP0_PATH=$(ARDUINO_LIBRARY_PATH)R4A_ESP32/binaries/
 BIN_PATH=$(BUILD_PATH)$(BOARD_PATH)/
 BOOT_LOADER_PATH=$(BUILD_PATH)$(BOARD_PATH)/
 HOME_BOARD_PATH=$(USER_DIRECTORY_PATH).arduino15/packages/esp32/
@@ -125,7 +126,7 @@ endif
 #---------
 
 # Files
-BIN_FILE=$(BIN_PATH)$(SKETCH).ino.merged.bin
+BIN_FILE=$(BIN_PATH)$(SKETCH).ino.bin
 
 ##########
 # Buid all the sources - must be first
@@ -200,7 +201,10 @@ upload:	$(BIN_FILE)
 		--flash_freq 80m \
 		--flash_size detect \
 		--compress \
-		      0   $<
+		      0   $(BOOT_LOADER_PATH)$(SKETCH).ino.bootloader.bin \
+		 0x8000   $(BOOT_LOADER_PATH)$(SKETCH).ino.partitions.bin \
+		 0xe000   $(BOOT_APP0_PATH)boot_app0.bin \
+		0x10000   $<
 	$(TERMINAL_APP) -D $(TERMINAL_PORT) $(TERMINAL_PARAMS)
 
 ##########

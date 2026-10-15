@@ -12,3 +12,5 @@ const char * password[WIFI_SSID_ENTRIES] =  // Your WiFi password
 };
 
 const char *startUrl = "Path to a .png image on your web server";
+
+const char * csvFileUrl = "Path to a .csv file on your web server";
