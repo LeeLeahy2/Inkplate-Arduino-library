@@ -69,66 +69,27 @@
 //----------------------------------------
 
 Inkplate display;
-volatile RTC_DATA_ATTR long randomNumber;
+volatile RTC_DATA_ATTR uint32_t imageNumber;
 
-#if 0
-setup:
-    determine if SD card available
-    if (sd card available)
-    {
-        determine if USB is connected
-        get load date from RTC
-        if (current date != load date) || (.csv does not exist on SD card)
-        {
-            start network
-            read .csv file
-            copy it to SD card
-            save load date to RTC
-            get total files from RTC
-            for each entry in the .csv file
-            {
-                if (file does not exist on SD card)
-                {
-                    read file from network
-                    Save file to SD card
-                    Add one to total files
-                }
-            }
-            save total files to RTC
-        }
-        if (.csv file on SD card)
-            displayImageFromSdCard()
-        else
-            displayImageFromNetwork();
-    }
-    else
-        displayImageFromNetwork();
-    generate new random number
-    save random number in rtc
-    enable wakeup_push_button
-    enable wakeup_timer(15 minutes)
-    deep sleep
+//----------------------------------------
+// Type declarations
+//----------------------------------------
 
-displayImageFromNetwork()
+// File information
+typedef struct _FILE_INFO
 {
-    start network
-    read .csv file
-    get random number from RTC
-    count total files listed in .csv
-    choose url from .csv file
-    display that image
-}
+    struct _FILE_INFO * _next;
+    const char * _filePath;
+    size_t _fileBytes;
+    bool _isDirectory;
+} FILE_INFO;
 
-displayImageFromSdCard()
-{
-    read .csv file from SD card
-    get random number from RTC
-    get total files from RTC
-    choose image file from .csv file
-    display that image
-}
+// Callback routine to process files from directory listing
+typedef bool (* SD_CARD_PROCESS_FILES)(const FILE_INFO ** fileTable,
+                                       size_t fileCount,
+                                       void * context,
+                                       Print * debugPrint);
 
-#endif // 0
 
 //----------------------------------------
 // Starting point for the application
@@ -144,15 +105,12 @@ void setup()
     display.begin();
     display.setTextColor(INKPLATE_BLACK);
 
-    // Display an image from the network
-    networkDisplayImage(NETWORK_TIMEOUT, &Serial);
+    // Display an image from the SD card or the network
+    if (sdCardDisplayImage(&Serial) == false)
+        networkDisplayImage(NETWORK_TIMEOUT, &Serial);
 
-    // Generate and save the random number
-Serial.printf("Seeding with randomNumber: %d\r\n", randomNumber);
-    randomNumber = randomNumber + 1;
-Serial.printf("randomNumber: %d\r\n", randomNumber);
-
-    Serial.println("Going to sleep");
+    // Set the next image number
+    imageNumber += 1;
 
     // Enable push button wakup from deep sleep on gpio 18
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_18, 0);
@@ -161,6 +119,7 @@ Serial.printf("randomNumber: %d\r\n", randomNumber);
     esp_sleep_enable_timer_wakeup(15ll * 60 * 1000 * 1000);
 
     // Start deep sleep (this function does not return). Program stops here.
+    Serial.println("Going to sleep");
     esp_deep_sleep_start();
 }
 
