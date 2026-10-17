@@ -80,7 +80,7 @@ bool sdCardDisplayImage(Print * debugPrint)
         if (debugPrint)
             debugPrint->println("SD card online");
 
-sdCardDirectoryListing("/", &Serial);
+sdCardDirectoryListing("/", true, &Serial);
     } while (0);
     return success;
 }
@@ -187,9 +187,10 @@ bool sdCardDirectoryListing(const FILE_INFO ** fileTable,
 //----------------------------------------
 // SD card directory listing
 //----------------------------------------
-bool sdCardDirectoryListing(const char * path, Print * debugPrint)
+bool sdCardDirectoryListing(const char * path, bool walkTree, Print * debugPrint)
 {
     return sdCardWalkDirectory(path,
+                               walkTree,
                                sdCardDirectoryListing,
                                nullptr,
                                debugPrint);
@@ -198,41 +199,37 @@ bool sdCardDirectoryListing(const char * path, Print * debugPrint)
 //----------------------------------------
 // SD card directory listing
 //----------------------------------------
-bool sdCardWalkDirectory(const char * path,
-                         SD_CARD_PROCESS_FILES processFiles,
-                         void * context,
-                         Print * debugPrint)
+bool sdCardWalkDirectoryTree(const char * path,
+                             FILE_INFO * &fileList,
+                             bool walkTree,
+                             SD_CARD_PROCESS_FILES processFiles,
+                             void * context,
+                             Print * debugPrint)
 {
     bool directory;
-    uint32_t fileCount;
     FILE_INFO * fileInfo;
-    FILE_INFO * fileList;
-    FILE_INFO ** fileTable;
     char fileName[256];
-    const char * name;
     SdFile sdFile;
     SdFile sdRootDir;
-    bool success;
-    FILE_INFO * temp;
     size_t size;
+    char * string;
+    bool success;
 
     // Start at the beginning of the directory
-    success = false;
-    if (sdRootDir.open(path))
+    success = true;
+    if (sdRootDir.open(path) == false)
     {
-        fileList = nullptr;
-        fileCount = 0;
-
+        Serial.printf("ERROR: Failed to open directory: %s\r\n", path);
+        success = false;
+    }
+    else
+    {
         // List the contents of the directory
         while (1)
         {
             // Open the next file
             if (!sdFile.openNext(&sdRootDir, O_RDONLY))
-            {
-                if (processFiles)
-                    success = processFiles(nullptr, 0, context, debugPrint);
                 break;
-            }
 
             // Get the file attributes
             sdFile.getName(fileName, sizeof(fileName));
@@ -243,59 +240,127 @@ bool sdCardWalkDirectory(const char * path,
             sdFile.close();
 
             // Allocate the FILE_INFO structure
-            fileInfo = (FILE_INFO *)malloc(sizeof(FILE_INFO) + strlen(fileName) + 1);
+            fileInfo = (FILE_INFO *)malloc(sizeof(FILE_INFO)
+                                           + strlen(path)
+                                           + strlen(fileName)
+                                           + (directory ? 1 : 0)
+                                           + 1);
             if (fileInfo == nullptr)
             {
                 Serial.println("ERROR: Failed to allocate FILE_INFO structure");
+                success = false;
                 break;
             }
 
             // Fill the FILE_INFO object
             fileInfo->_filePath = (const char *)(fileInfo + 1);
-            strcpy((char *)(fileInfo->_filePath), fileName);
+            string = (char *)(fileInfo->_filePath);
+            strcpy(string, path);
+            strcat(string, fileName);
+            if (directory)
+                strcat(string, "/");
             fileInfo->_fileBytes = size;
             fileInfo->_isDirectory = directory;
             fileInfo->_next = fileList;
             fileList = fileInfo;
-            fileCount += 1;
+
+            // Walk the subdirectory
+            if (walkTree)
+            {
+                if (sdCardWalkDirectoryTree(string,
+                                            fileList,
+                                            walkTree,
+                                            processFiles,
+                                            context,
+                                            debugPrint) == false)
+                {
+                    success = false;
+                    break;
+                }
+            }
         }
 
         // Close the directory
         sdRootDir.close();
+    }
+    return success;
+}
 
-        // Allocate the file table
-        fileTable = (FILE_INFO **)malloc(fileCount * sizeof(fileTable));
-        if (fileTable == nullptr)
-            Serial.println("ERROR: Failed to allocate file table");
+//----------------------------------------
+// SD card directory listing
+//----------------------------------------
+bool sdCardWalkDirectory(const char * path,
+                         bool walkTree,
+                         SD_CARD_PROCESS_FILES processFiles,
+                         void * context,
+                         Print * debugPrint)
+{
+    uint32_t fileCount;
+    FILE_INFO * fileList;
+    FILE_INFO ** fileTable;
+    bool success;
+    FILE_INFO * temp;
+
+    // Start at the beginning of the directory
+    fileList = nullptr;
+    success = sdCardWalkDirectoryTree(path,
+                                      fileList,
+                                      walkTree,
+                                      processFiles,
+                                      context,
+                                      debugPrint);
+    if (success)
+    {
+        fileCount = 0;
+        fileTable = nullptr;
+
+        // Count the files in the list
+        temp = fileList;
+        while (temp)
+        {
+            fileCount += 1;
+            temp = temp->_next;
+        }
+
+        // Build the table of files
+        if (fileCount == 0)
+            Serial.println("No files found");
         else
         {
-            // Initialize the file table
-            temp = fileList;
-            for (int entry = 0; entry < fileCount; entry += 1)
+            // Allocate the file table
+            fileTable = (FILE_INFO **)malloc(fileCount * sizeof(fileTable));
+            if (fileTable == nullptr)
+                Serial.println("ERROR: Failed to allocate file table");
+            else
             {
-                fileTable[entry] = temp;
-                temp = temp->_next;
-            }
-
-            // Sort the file table
-            for (int i = 0; i < (fileCount - 1); i++)
-            {
-                for (int j = i + 1; j < fileCount; j++)
+                // Initialize the file table
+                temp = fileList;
+                for (int entry = 0; entry < fileCount; entry += 1)
                 {
-                    if (strcasecmp(fileTable[i]->_filePath, fileTable[j]->_filePath) > 0)
+                    fileTable[entry] = temp;
+                    temp = temp->_next;
+                }
+
+                // Sort the file table
+                for (int i = 0; i < (fileCount - 1); i++)
+                {
+                    for (int j = i + 1; j < fileCount; j++)
                     {
-                        // Switch entries
-                        temp = fileTable[i];
-                        fileTable[i] = fileTable[j];
-                        fileTable[j] = temp;
+                        if (strcasecmp(fileTable[i]->_filePath, fileTable[j]->_filePath) > 0)
+                        {
+                            // Switch entries
+                            temp = fileTable[i];
+                            fileTable[i] = fileTable[j];
+                            fileTable[j] = temp;
+                        }
                     }
                 }
             }
-
-            // Process the directory listing
-            if (processFiles)
-                success = processFiles((const FILE_INFO **)fileTable, fileCount, context, debugPrint);
         }
+
+        // Process the directory listing
+        if (processFiles)
+            success = processFiles((const FILE_INFO **)fileTable, fileCount, context, debugPrint);
     }
 
     // Free the file table
