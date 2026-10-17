@@ -82,6 +82,18 @@ typedef struct _CSV_ENTRY
     const char * _url;
 } CSV_ENTRY;
 
+// Context passed to processCsvLines routine
+typedef struct _CSV_CONTEXT
+{
+    const CSV_ENTRY * _csvTable;
+    uint32_t lineCount;
+} CSV_CONTEXT;
+
+// Callback routine to process lines of the CSV file
+typedef bool (* NETWORK_PROCESS_CSV_LINES)(const CSV_ENTRY * csvTable,
+                                           uint32_t lineCount,
+                                           Print * debugPrint);
+
 // File information
 typedef struct _FILE_INFO
 {
@@ -96,7 +108,6 @@ typedef bool (* SD_CARD_PROCESS_FILES)(const FILE_INFO ** fileTable,
                                        uint32_t fileCount,
                                        void * context,
                                        Print * debugPrint);
-
 
 //----------------------------------------
 // Starting point for the application

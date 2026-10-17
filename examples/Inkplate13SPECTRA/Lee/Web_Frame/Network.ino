@@ -13,7 +13,64 @@
 //----------------------------------------
 // Display an image from the network
 //----------------------------------------
-void networkDisplayImage(uint32_t timeout, Print * debugPrint)
+bool networkDisplayImage(uint32_t timeout, Print * debugPrint)
+{
+    bool success;
+
+    // Load, parse and sort the CSV file
+    success = networkReadCsvFile(networkSelectImage,
+                                 timeout,
+                                 debugPrint);
+    return success;
+}
+
+//----------------------------------------
+// Display the contents of the URL
+//----------------------------------------
+bool networkDisplayUrl(const char * url)
+{
+    bool success;
+
+    // Get the final image URL (resolve HTTP redirect)
+    Serial.println(url);
+
+    // Locate the image extension
+    const char * extension = &url[strlen(url) -1];
+    while (*extension != '.')
+        extension -= 1;
+
+    // Select routine based upon the image extension
+    success = false;
+    if (strcmp(extension, ".bmp") == 0)
+    {
+        Serial.println("Loading .BMP image");
+        success = display.image.drawBitmapFromWeb(url, 0, 0, true, false);
+    }
+    else if ((strcmp(extension, ".jpg") == 0) || (strcmp(extension, ".jpeg") == 0))
+    {
+        // Download and draw the JPEG image directly from the web
+        // Function returns 1 on success and 0 on failure
+        Serial.println("Loading .JPG image");
+        success = display.image.drawJpegFromWeb(url, 0, 0, true, false);
+    }
+    else if (strcmp(extension, ".png") == 0)
+    {
+        Serial.println("Loading .PNG image");
+        success = display.image.drawPngFromWeb(url, 0, 0, true, false);
+    }
+
+    // Display the image
+    if (success)
+        display.display();
+    return success;
+}
+
+//----------------------------------------
+// Read the CSV file from the network
+//----------------------------------------
+bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
+                        uint32_t timeout,
+                        Print * debugPrint)
 {
     char * csvData;
     CSV_ENTRY * csvEntry;
@@ -23,10 +80,12 @@ void networkDisplayImage(uint32_t timeout, Print * debugPrint)
     size_t fileBytes;
     HTTPClient https;
     size_t remainingBytes;
+    bool success;
     const char * url;
 
     do
     {
+        success = false;
         csvTable = nullptr;
 
         // Start the network
@@ -191,57 +250,16 @@ void networkDisplayImage(uint32_t timeout, Print * debugPrint)
                 }
             }
 
-        // Select a line in the file
-        uint32_t lineNumber = imageNumber % (lineCount - 1);
-
-        // Skip the header line
-        lineNumber += 1;
-
-        // Locate the URL
-        url = csvTable[lineNumber]._url;
-
-        // Display the image
-        networkDisplayUrl(url);
+        // Process the CSV file
+        if (processLines)
+            success = processLines(csvTable, lineCount, debugPrint);
     } while (0);
 
     // Release the resources
     if (csvData)
         free(csvData);
     https.end();
-}
-
-//----------------------------------------
-// Display the contents of the URL
-//----------------------------------------
-void networkDisplayUrl(const char * url)
-{
-    // Get the final image URL (resolve HTTP redirect)
-    Serial.println(url);
-
-    // Locate the image extension
-    const char * extension = &url[strlen(url) -1];
-    while (*extension != '.')
-        extension -= 1;
-
-    // Select routine based upon the image extension
-    if (strcmp(extension, ".bmp") == 0)
-    {
-        Serial.println("Loading .BMP image");
-        Serial.println(display.image.drawBitmapFromWeb(url, 0, 0, true, false));
-    }
-    else if ((strcmp(extension, ".jpg") == 0) || (strcmp(extension, ".jpeg") == 0))
-    {
-        // Download and draw the JPEG image directly from the web
-        // Function returns 1 on success and 0 on failure
-        Serial.println("Loading .JPG image");
-        Serial.println(display.image.drawJpegFromWeb(url, 0, 0, true, false));
-    }
-    else if (strcmp(extension, ".png") == 0)
-    {
-        Serial.println("Loading .PNG image");
-        Serial.println(display.image.drawPngFromWeb(url, 0, 0, true, false));
-    }
-    display.display();
+    return success;
 }
 
 //----------------------------------------
@@ -254,7 +272,7 @@ String networkGetServerFromUrl(const char * url)
     size_t index;
     size_t length;
     size_t pos;
-    char * server;
+    char server[strlen(url) + 1];
     String serverString;
 
     do
@@ -270,11 +288,10 @@ String networkGetServerFromUrl(const char * url)
         // Remove the protocol prefix from the URL
         index = 0;
         pos = 0;
-        length = strlen(url);
-        char server[length + 1];
-        if (strncmp(url, https, strlen(https)) == 0)
+        server[0] = 0;
+        if (strncasecmp(url, https, strlen(https)) == 0)
             pos = strlen(https);
-        else if (strncmp(url, http, strlen(http)) == 0)
+        else if (strncasecmp(url, http, strlen(http)) == 0)
             pos = strlen(http);
         if (pos)
         {
@@ -355,6 +372,29 @@ String networkGetServerIpAddress(const char * server, Print * debugPrint)
         freeaddrinfo(res); // Free the memory
     }
     return ipAddress;
+}
+
+//----------------------------------------
+// Select and display an image from the network
+//----------------------------------------
+bool networkSelectImage(const CSV_ENTRY * csvTable,
+                        uint32_t lineCount,
+                        Print * debugPrint)
+{
+    uint32_t lineNumber;
+    const char * url;
+
+    // Select a line in the file
+    lineNumber = imageNumber % (lineCount - 1);
+
+    // Skip the header line
+    lineNumber += 1;
+
+    // Locate the URL
+    url = csvTable[lineNumber]._url;
+
+    // Display the image
+    return networkDisplayUrl(url);
 }
 
 //----------------------------------------
