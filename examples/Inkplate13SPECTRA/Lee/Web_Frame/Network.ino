@@ -16,14 +16,19 @@
 void networkDisplayImage(uint32_t timeout, Print * debugPrint)
 {
     char * csvData;
+    CSV_ENTRY * csvEntry;
+    CSV_ENTRY * csvTable;
+    CSV_ENTRY * csvTemp;
     NetworkClient * csvStream;
     size_t fileBytes;
     HTTPClient https;
     size_t remainingBytes;
-    char * url;
+    const char * url;
 
     do
     {
+        csvTable = nullptr;
+
         // Start the network
         networkStart(debugPrint);
 
@@ -130,22 +135,70 @@ void networkDisplayImage(uint32_t timeout, Print * debugPrint)
             break;
         }
 
+        // Allocate the CSV table
+        csvTable = (CSV_ENTRY *)malloc(lineCount * sizeof(CSV_ENTRY));
+        if (csvTable == nullptr)
+        {
+            if (debugPrint)
+                debugPrint->println("ERROR: Failed to allocate CSV table");
+            break;
+        }
+
+        // Walk the lines in the CSV file
+        csvEntry = csvTable;
+        data = csvData;
+        dataEnd = &data[fileBytes];
+        while (data < dataEnd)
+        {
+            csvEntry->_filePath = data;
+
+            // Locate the comma separation
+            while (*data)
+            {
+                if (*data == ',')
+                {
+                    // Zero-terminate the file path
+                    *data++ = 0;
+                    break;
+                }
+                data += 1;
+            }
+
+            // Save the URL
+            csvEntry->_url = data;
+
+            // Get the next line and csvEntry
+            data += strlen(data) + 1;
+            csvEntry += 1;
+        }
+
+        // Sort the entries
+        for (int i = 1; i < (lineCount - 1); i++)
+            for (int j = i + 1; j < lineCount; j++)
+            {
+                if (strcasecmp(csvTable[i]._filePath, csvTable[j]._filePath) > 0)
+                {
+                    const char * temp;
+
+                    // Switch entries
+                    temp = csvTable[i]._filePath;
+                    csvTable[i]._filePath = csvTable[j]._filePath;
+                    csvTable[j]._filePath = temp;
+
+                    temp = csvTable[i]._url;
+                    csvTable[i]._url = csvTable[j]._url;
+                    csvTable[j]._url = temp;
+                }
+            }
+
         // Select a line in the file
         uint32_t lineNumber = imageNumber % (lineCount - 1);
 
         // Skip the header line
         lineNumber += 1;
 
-        // Locate the line
-        data = csvData;
-        while (lineNumber--)
-            data += strlen((const char *)data) + 1;
-
         // Locate the URL
-        while (*data++ != ',')
-        {
-        }
-        url = data;
+        url = csvTable[lineNumber]._url;
 
         // Display the image
         networkDisplayUrl(url);
@@ -160,13 +213,13 @@ void networkDisplayImage(uint32_t timeout, Print * debugPrint)
 //----------------------------------------
 // Display the contents of the URL
 //----------------------------------------
-void networkDisplayUrl(char * url)
+void networkDisplayUrl(const char * url)
 {
     // Get the final image URL (resolve HTTP redirect)
     Serial.println(url);
 
     // Locate the image extension
-    char * extension = &url[strlen(url) -1];
+    const char * extension = &url[strlen(url) -1];
     while (*extension != '.')
         extension -= 1;
 

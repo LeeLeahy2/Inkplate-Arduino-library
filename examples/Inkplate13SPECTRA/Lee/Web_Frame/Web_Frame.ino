@@ -75,6 +75,13 @@ volatile RTC_DATA_ATTR uint32_t imageNumber;
 // Type declarations
 //----------------------------------------
 
+// Comma separated list information
+typedef struct _CSV_ENTRY
+{
+    const char * _filePath;
+    const char * _url;
+} CSV_ENTRY;
+
 // File information
 typedef struct _FILE_INFO
 {
