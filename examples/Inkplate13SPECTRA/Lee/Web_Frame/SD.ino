@@ -60,6 +60,148 @@ displayImageFromSdCard()
 #endif // 0
 
 //----------------------------------------
+// SD card delete directory or directory tree
+//----------------------------------------
+bool sdCardDeleteDirectory(const char * path, bool walkTree, Print * debugPrint)
+{
+    bool success;
+
+    success =  sdCardWalkDirectory(path,
+                                   walkTree,
+                                   sdCardDeleteFile,
+                                   nullptr,
+                                   debugPrint);
+    if ((success == false) && debugPrint)
+        sdCardDirectoryListing(path, walkTree, debugPrint);
+    return success;
+}
+
+//----------------------------------------
+// SD card delete a file
+//----------------------------------------
+bool sdCardDeleteFile(const FILE_INFO ** fileTable,
+                      uint32_t fileCount,
+                      void * context,
+                      Print * debugPrint)
+{
+    char * filePath;
+    SdFile sdRootDir;
+    bool success;
+
+    // Start at the beginning of the directory
+    if (sdRootDir.open("/") == false)
+    {
+        Serial.println("ERROR: Failed to open the root directory");
+        success = false;
+    }
+    else
+    {
+        // Walk the file table and delete the files
+        success = true;
+        for (uint32_t entry = 0; entry < fileCount; entry++)
+        {
+            // Skip the directory entries
+            if (fileTable[entry]->_isDirectory == false)
+            {
+                SdFile file;
+                filePath = (char *)&fileTable[entry]->_filePath[1];
+                if (file.open(filePath, O_RDWR) == false)
+                {
+                    perror("Failed to open file\r\n");
+                    Serial.printf("File: %s\r\n", filePath);
+                    success = false;
+                }
+                if (file.remove() == false)
+                {
+                    perror("Failed to delete file\r\n");
+                    Serial.printf("File: %s\r\n", filePath);
+                    success = false;
+                }
+            }
+        }
+
+        // Walk the file table and delete the directories if possible
+        for (uint32_t entry = 0; entry < fileCount; entry++)
+        {
+            // Skip the file entries
+            if (fileTable[entry]->_isDirectory)
+            {
+                filePath = (char *)&fileTable[entry]->_filePath[1];
+                filePath[strlen(filePath) - 1] = 0;
+                if (display.getSdFat().rmdir(filePath) == false)
+                {
+                    perror("Failed to delete directory\r\n");
+                    Serial.printf("File: %s\r\n", filePath);
+                    success = false;
+                }
+            }
+        }
+
+        // Close the directory
+        sdRootDir.close();
+    }
+    return success;
+}
+
+//----------------------------------------
+// SD card directory listing
+//----------------------------------------
+bool sdCardDirectoryListFiles(const FILE_INFO ** fileTable,
+                              uint32_t fileCount,
+                              void * context,
+                              Print * debugPrint)
+{
+    // Display the directory listing
+    sdCardDisplayFileInfoTableHeader(fileCount);
+    for (int entry = 0; entry < fileCount; entry++)
+        sdCardDisplayFileInfoTableEntry(fileTable[entry]);
+    return true;
+}
+
+//----------------------------------------
+// SD card directory listing
+//----------------------------------------
+bool sdCardDirectoryListing(const char * path, bool walkTree, Print * debugPrint)
+{
+    return sdCardWalkDirectory(path,
+                               walkTree,
+                               sdCardDirectoryListFiles,
+                               nullptr,
+                               debugPrint);
+}
+
+//----------------------------------------
+// Display a file table entry
+//----------------------------------------
+void sdCardDisplayFileInfoTableEntry(const FILE_INFO * fileInfo)
+{
+    // Display the file attributes
+    Serial.printf("%10d   %s   %s\r\n",
+                  fileInfo->_fileBytes,
+                  fileInfo->_isDirectory ? "Dir" : "   ",
+                  fileInfo->_filePath);
+}
+
+//----------------------------------------
+// Display the file table header
+//----------------------------------------
+void sdCardDisplayFileInfoTableHeader(uint32_t fileCount)
+{
+    // Display the partition name
+    Serial.printf("\r\nSD Card Files\r\n");
+
+    if (fileCount == 0)
+        Serial.printf("No SD card files found\r\n");
+    else
+    {
+        Serial.printf("      Size   Dir   File Name\r\n");
+        //                      1                  1         2
+        //             1234567890   123   12345678901234567890
+        Serial.printf("----------   ---   --------------------\r\n");
+    }
+}
+
+//----------------------------------------
 // Display an image from the SD card
 //----------------------------------------
 bool sdCardDisplayImage(Print * debugPrint)
@@ -138,251 +280,6 @@ sdCardDirectoryListing("/", true, &Serial);
 
     }
 */
-
-//----------------------------------------
-// Display the file table header
-//----------------------------------------
-void sdCardDisplayFileInfoTableHeader(uint32_t fileCount)
-{
-    // Display the partition name
-    Serial.printf("\r\nSD Card Files\r\n");
-
-    if (fileCount == 0)
-        Serial.printf("No SD card files found\r\n");
-    else
-    {
-        Serial.printf("      Size   Dir   File Name\r\n");
-        //                      1                  1         2
-        //             1234567890   123   12345678901234567890
-        Serial.printf("----------   ---   --------------------\r\n");
-    }
-}
-
-//----------------------------------------
-// Display a file table entry
-//----------------------------------------
-void sdCardDisplayFileInfoTableEntry(const FILE_INFO * fileInfo)
-{
-    // Display the file attributes
-    Serial.printf("%10d   %s   %s\r\n",
-                  fileInfo->_fileBytes,
-                  fileInfo->_isDirectory ? "Dir" : "   ",
-                  fileInfo->_filePath);
-}
-
-//----------------------------------------
-// SD card directory listing
-//----------------------------------------
-bool sdCardDirectoryListing(const FILE_INFO ** fileTable,
-                            uint32_t fileCount,
-                            void * context,
-                            Print * debugPrint)
-{
-    // Display the directory listing
-    sdCardDisplayFileInfoTableHeader(fileCount);
-    for (int entry = 0; entry < fileCount; entry++)
-        sdCardDisplayFileInfoTableEntry(fileTable[entry]);
-    return true;
-}
-
-//----------------------------------------
-// SD card delete a file
-//----------------------------------------
-bool sdCardDeleteFile(const FILE_INFO ** fileTable,
-                      uint32_t fileCount,
-                      void * context,
-                      Print * debugPrint)
-{
-    char * filePath;
-    SdFile sdRootDir;
-    bool success;
-
-    // Start at the beginning of the directory
-    if (sdRootDir.open("/") == false)
-    {
-        Serial.println("ERROR: Failed to open the root directory");
-        success = false;
-    }
-    else
-    {
-        // Walk the file table and delete the files
-        success = true;
-        for (uint32_t entry = 0; entry < fileCount; entry++)
-        {
-            // Skip the directory entries
-            if (fileTable[entry]->_isDirectory == false)
-            {
-                SdFile file;
-                filePath = (char *)&fileTable[entry]->_filePath[1];
-                if (file.open(filePath, O_RDWR) == false)
-                {
-                    perror("Failed to open file\r\n");
-                    Serial.printf("File: %s\r\n", filePath);
-                    success = false;
-                }
-                if (file.remove() == false)
-                {
-                    perror("Failed to delete file\r\n");
-                    Serial.printf("File: %s\r\n", filePath);
-                    success = false;
-                }
-            }
-        }
-
-        // Walk the file table and delete the directories if possible
-        for (uint32_t entry = 0; entry < fileCount; entry++)
-        {
-            // Skip the file entries
-            if (fileTable[entry]->_isDirectory)
-            {
-                filePath = (char *)&fileTable[entry]->_filePath[1];
-                filePath[strlen(filePath) - 1] = 0;
-                if (display.getSdFat().rmdir(filePath) == false)
-                {
-                    perror("Failed to delete directory\r\n");
-                    Serial.printf("File: %s\r\n", filePath);
-                    success = false;
-                }
-            }
-        }
-
-        // Close the directory
-        sdRootDir.close();
-    }
-    return success;
-}
-
-//----------------------------------------
-// SD card directory listing
-//----------------------------------------
-bool sdCardDeleteDirectory(const char * path, bool walkTree, Print * debugPrint)
-{
-//    SdFile sdRootDir;
-    bool success;
-
-    // Start at the beginning of the directory
-//    if (sdRootDir.open(path) == false)
-//    {
-//        Serial.printf("ERROR: Failed to open directory: %s\r\n", path);
-//        success = false;
-//    }
-//    else
-    {
-        success =  sdCardWalkDirectory(path,
-                                       walkTree,
-                                       sdCardDeleteFile,
-                                       nullptr,
-                                       debugPrint);
-        // Close the directory
-//        sdRootDir.close();
-
-        if ((success == false) && debugPrint)
-            sdCardDirectoryListing(path, walkTree, debugPrint);
-    }
-    return success;
-}
-
-//----------------------------------------
-// SD card directory listing
-//----------------------------------------
-bool sdCardDirectoryListing(const char * path, bool walkTree, Print * debugPrint)
-{
-    return sdCardWalkDirectory(path,
-                               walkTree,
-                               sdCardDirectoryListing,
-                               nullptr,
-                               debugPrint);
-}
-
-//----------------------------------------
-// SD card directory listing
-//----------------------------------------
-bool sdCardWalkDirectoryTree(const char * path,
-                             FILE_INFO * &fileList,
-                             bool walkTree,
-                             SD_CARD_PROCESS_FILES processFiles,
-                             void * context,
-                             Print * debugPrint)
-{
-    bool directory;
-    FILE_INFO * fileInfo;
-    char fileName[256];
-    SdFile sdFile;
-    SdFile sdRootDir;
-    size_t size;
-    char * string;
-    bool success;
-
-    // Start at the beginning of the directory
-    success = true;
-    if (sdRootDir.open(path) == false)
-    {
-        Serial.printf("ERROR: Failed to open directory: %s\r\n", path);
-        success = false;
-    }
-    else
-    {
-        // List the contents of the directory
-        while (1)
-        {
-            // Open the next file
-            if (!sdFile.openNext(&sdRootDir, O_RDONLY))
-                break;
-
-            // Get the file attributes
-            sdFile.getName(fileName, sizeof(fileName));
-            size = sdFile.fileSize();
-            directory = sdFile.isDir();
-
-            // Done with this file
-            sdFile.close();
-
-            // Allocate the FILE_INFO structure
-            fileInfo = (FILE_INFO *)malloc(sizeof(FILE_INFO)
-                                           + strlen(path)
-                                           + strlen(fileName)
-                                           + (directory ? 1 : 0)
-                                           + 1);
-            if (fileInfo == nullptr)
-            {
-                Serial.println("ERROR: Failed to allocate FILE_INFO structure");
-                success = false;
-                break;
-            }
-
-            // Fill the FILE_INFO object
-            fileInfo->_filePath = (const char *)(fileInfo + 1);
-            string = (char *)(fileInfo->_filePath);
-            strcpy(string, path);
-            strcat(string, fileName);
-            if (directory)
-                strcat(string, "/");
-            fileInfo->_fileBytes = size;
-            fileInfo->_isDirectory = directory;
-            fileInfo->_next = fileList;
-            fileList = fileInfo;
-
-            // Walk the subdirectory
-            if (walkTree)
-            {
-                if (sdCardWalkDirectoryTree(string,
-                                            fileList,
-                                            walkTree,
-                                            processFiles,
-                                            context,
-                                            debugPrint) == false)
-                {
-                    success = false;
-                    break;
-                }
-            }
-        }
-
-        // Close the directory
-        sdRootDir.close();
-    }
-    return success;
-}
 
 //----------------------------------------
 // SD card directory listing
@@ -471,6 +368,96 @@ bool sdCardWalkDirectory(const char * path,
         temp = fileList;
         fileList = fileList->_next;
         free(temp);
+    }
+    return success;
+}
+
+//----------------------------------------
+// SD card directory listing
+//----------------------------------------
+bool sdCardWalkDirectoryTree(const char * path,
+                             FILE_INFO * &fileList,
+                             bool walkTree,
+                             SD_CARD_PROCESS_FILES processFiles,
+                             void * context,
+                             Print * debugPrint)
+{
+    bool directory;
+    FILE_INFO * fileInfo;
+    char fileName[256];
+    SdFile sdFile;
+    SdFile sdRootDir;
+    size_t size;
+    char * string;
+    bool success;
+
+    // Start at the beginning of the directory
+    success = true;
+    if (sdRootDir.open(path) == false)
+    {
+        Serial.printf("ERROR: Failed to open directory: %s\r\n", path);
+        success = false;
+    }
+    else
+    {
+        // List the contents of the directory
+        while (1)
+        {
+            // Open the next file
+            if (!sdFile.openNext(&sdRootDir, O_RDONLY))
+                break;
+
+            // Get the file attributes
+            sdFile.getName(fileName, sizeof(fileName));
+            size = sdFile.fileSize();
+            directory = sdFile.isDir();
+
+            // Done with this file
+            sdFile.close();
+
+            // Allocate the FILE_INFO structure
+            fileInfo = (FILE_INFO *)malloc(sizeof(FILE_INFO)
+                                           + strlen(path)
+                                           + strlen(fileName)
+                                           + (directory ? 1 : 0)
+                                           + 1);
+            if (fileInfo == nullptr)
+            {
+                Serial.println("ERROR: Failed to allocate FILE_INFO structure");
+                success = false;
+                break;
+            }
+
+            // Fill the FILE_INFO object
+            fileInfo->_filePath = (const char *)(fileInfo + 1);
+            string = (char *)(fileInfo->_filePath);
+            strcpy(string, path);
+            strcat(string, fileName);
+            if (directory)
+                strcat(string, "/");
+            fileInfo->_fileBytes = size;
+            fileInfo->_isDirectory = directory;
+            fileInfo->_next = fileList;
+            fileList = fileInfo;
+
+            // Walk the subdirectory
+            if (walkTree)
+            {
+                if (sdCardWalkDirectoryTree(string,
+                                            fileList,
+                                            walkTree,
+                                            processFiles,
+                                            context,
+                                            debugPrint) == false)
+                {
+                    success = false;
+                    break;
+                }
+            }
+        }
+
+        // Close the directory
+        sdRootDir.close();
     }
     return success;
 }
