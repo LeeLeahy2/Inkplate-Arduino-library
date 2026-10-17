@@ -86,7 +86,7 @@ typedef struct _FILE_INFO
 
 // Callback routine to process files from directory listing
 typedef bool (* SD_CARD_PROCESS_FILES)(const FILE_INFO ** fileTable,
-                                       size_t fileCount,
+                                       uint32_t fileCount,
                                        void * context,
                                        Print * debugPrint);
 

@@ -80,6 +80,7 @@ bool sdCardDisplayImage(Print * debugPrint)
         if (debugPrint)
             debugPrint->println("SD card online");
 
+sdCardDeleteDirectory("/", true, &Serial);
 sdCardDirectoryListing("/", true, &Serial);
     } while (0);
     return success;
@@ -173,7 +174,7 @@ void sdCardDisplayFileInfoTableEntry(const FILE_INFO * fileInfo)
 // SD card directory listing
 //----------------------------------------
 bool sdCardDirectoryListing(const FILE_INFO ** fileTable,
-                            size_t fileCount,
+                            uint32_t fileCount,
                             void * context,
                             Print * debugPrint)
 {
@@ -182,6 +183,103 @@ bool sdCardDirectoryListing(const FILE_INFO ** fileTable,
     for (int entry = 0; entry < fileCount; entry++)
         sdCardDisplayFileInfoTableEntry(fileTable[entry]);
     return true;
+}
+
+//----------------------------------------
+// SD card delete a file
+//----------------------------------------
+bool sdCardDeleteFile(const FILE_INFO ** fileTable,
+                      uint32_t fileCount,
+                      void * context,
+                      Print * debugPrint)
+{
+    char * filePath;
+    SdFile sdRootDir;
+    bool success;
+
+    // Start at the beginning of the directory
+    if (sdRootDir.open("/") == false)
+    {
+        Serial.println("ERROR: Failed to open the root directory");
+        success = false;
+    }
+    else
+    {
+        // Walk the file table and delete the files
+        success = true;
+        for (uint32_t entry = 0; entry < fileCount; entry++)
+        {
+            // Skip the directory entries
+            if (fileTable[entry]->_isDirectory == false)
+            {
+                SdFile file;
+                filePath = (char *)&fileTable[entry]->_filePath[1];
+                if (file.open(filePath, O_RDWR) == false)
+                {
+                    perror("Failed to open file\r\n");
+                    Serial.printf("File: %s\r\n", filePath);
+                    success = false;
+                }
+                if (file.remove() == false)
+                {
+                    perror("Failed to delete file\r\n");
+                    Serial.printf("File: %s\r\n", filePath);
+                    success = false;
+                }
+            }
+        }
+
+        // Walk the file table and delete the directories if possible
+        for (uint32_t entry = 0; entry < fileCount; entry++)
+        {
+            // Skip the file entries
+            if (fileTable[entry]->_isDirectory)
+            {
+                filePath = (char *)&fileTable[entry]->_filePath[1];
+                filePath[strlen(filePath) - 1] = 0;
+                if (display.getSdFat().rmdir(filePath) == false)
+                {
+                    perror("Failed to delete directory\r\n");
+                    Serial.printf("File: %s\r\n", filePath);
+                    success = false;
+                }
+            }
+        }
+
+        // Close the directory
+        sdRootDir.close();
+    }
+    return success;
+}
+
+//----------------------------------------
+// SD card directory listing
+//----------------------------------------
+bool sdCardDeleteDirectory(const char * path, bool walkTree, Print * debugPrint)
+{
+//    SdFile sdRootDir;
+    bool success;
+
+    // Start at the beginning of the directory
+//    if (sdRootDir.open(path) == false)
+//    {
+//        Serial.printf("ERROR: Failed to open directory: %s\r\n", path);
+//        success = false;
+//    }
+//    else
+    {
+        success =  sdCardWalkDirectory(path,
+                                       walkTree,
+                                       sdCardDeleteFile,
+                                       nullptr,
+                                       debugPrint);
+        // Close the directory
+//        sdRootDir.close();
+
+        if ((success == false) && debugPrint)
+            sdCardDirectoryListing(path, walkTree, debugPrint);
+    }
+    return success;
 }
 
 //----------------------------------------
