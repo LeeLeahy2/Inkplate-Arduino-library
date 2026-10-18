@@ -63,6 +63,7 @@
 #define MICROSECONDS_IN_A_MINUTE    (MICROSECONDS_IN_A_SECOND * SECONDS_IN_A_MINUTE)
 
 #define NETWORK_TIMEOUT             ((uint32_t)(15 * MICROSECONDS_IN_A_MINUTE))
+#define DATA_TIMEOUT                (15 * MILLISECONDS_IN_A_SECOND)
 
 //----------------------------------------
 // Globals
@@ -86,7 +87,7 @@ typedef struct _CSV_ENTRY
 typedef struct _CSV_CONTEXT
 {
     const CSV_ENTRY * _csvTable;
-    uint32_t lineCount;
+    uint32_t _lineCount;
 } CSV_CONTEXT;
 
 // Callback routine to process lines of the CSV file
@@ -137,7 +138,7 @@ void setup()
     esp_sleep_enable_timer_wakeup(15ll * 60 * 1000 * 1000);
 
     // Start deep sleep (this function does not return). Program stops here.
-    Serial.println("Going to sleep");
+    Serial.print("Going to sleep\r\n\n\n");
     esp_deep_sleep_start();
 }
 
@@ -196,4 +197,18 @@ void dumpBuffer(size_t offset, const uint8_t *buffer, size_t length)
         buffer += bytes;
         offset += bytes;
     }
+}
+
+//----------------------------------------
+// If debug option is on, print available heap
+//----------------------------------------
+void reportHeapNow(bool includePsram)
+{
+    if (includePsram)
+        Serial.printf("FreeHeap: %d / HeapLowestPoint: %d / LargestBlock: %d / Used PSRAM: %d\r\n",
+                      ESP.getFreeHeap(), xPortGetMinimumEverFreeHeapSize(),
+                      heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), ESP.getPsramSize() - ESP.getFreePsram());
+    else
+        Serial.printf("FreeHeap: %d / HeapLowestPoint: %d / LargestBlock: %d\r\n", ESP.getFreeHeap(),
+                      xPortGetMinimumEverFreeHeapSize(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }

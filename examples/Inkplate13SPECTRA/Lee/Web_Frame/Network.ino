@@ -11,6 +11,21 @@
  **************************************************/
 
 //----------------------------------------
+// SD card copy the network files
+//----------------------------------------
+bool NetworkCopyFilesToSdCard(uint32_t timeout, Print * debugPrint)
+{
+    bool success;
+
+    // Load, parse and sort the CSV file
+    success = networkReadCsvFile(sdCardCopyNetworkFiles,
+                                 timeout,
+                                 debugPrint);
+    Serial.printf("NetworkCopyFilesToSdCard returning %d\r\n", success);
+    return success;
+}
+
+//----------------------------------------
 // Display an image from the network
 //----------------------------------------
 bool networkDisplayImage(uint32_t timeout, Print * debugPrint)
@@ -18,9 +33,11 @@ bool networkDisplayImage(uint32_t timeout, Print * debugPrint)
     bool success;
 
     // Load, parse and sort the CSV file
+reportHeapNow(false);
     success = networkReadCsvFile(networkSelectImage,
                                  timeout,
                                  debugPrint);
+reportHeapNow(false);
     return success;
 }
 
@@ -31,7 +48,7 @@ bool networkDisplayUrl(const char * url)
 {
     bool success;
 
-    // Get the final image URL (resolve HTTP redirect)
+    // Display the URL
     Serial.println(url);
 
     // Locate the image extension
@@ -62,6 +79,7 @@ bool networkDisplayUrl(const char * url)
     // Display the image
     if (success)
         display.display();
+    Serial.printf("networkDisplayUrl returning %d\r\n", success);
     return success;
 }
 
@@ -86,6 +104,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
     do
     {
         success = false;
+        csvData = nullptr;
         csvTable = nullptr;
 
         // Start the network
@@ -124,7 +143,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
             if (bytesToRead == 0)
             {
                 // Check for timeout
-                if ((millis() - timerStart) < timeout)
+                if ((millis() - timerStart) > timeout)
                 {
                     if (debugPrint)
                         debugPrint->println("ERROR: Timed out reading .CSV file");
@@ -256,6 +275,8 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
     } while (0);
 
     // Release the resources
+    if (csvTable)
+        free(csvTable);
     if (csvData)
         free(csvData);
     https.end();
