@@ -188,28 +188,24 @@ bool Image::drawPngFromSd(SdFile *p, int x, int y, bool dither, bool invert)
     _pngY = y;
     pngle_set_draw_callback(pngle, pngle_on_draw);
     uint32_t total = p->fileSize();
-    uint8_t buff[2048];
-    uint32_t pnt = 0;
-
-    while (pnt < total)
+    uint8_t * buff = (uint8_t *)malloc(total);
+    if (buff == nullptr)
     {
-        uint32_t toread = p->available();
-        if (toread > 0)
-        {
-            int len = p->read(buff, min((uint32_t)2048, toread));
-            int fed = pngle_feed(pngle, buff, len);
-            if (fed < 0)
-            {
-                ret = 0;
-                break;
-            }
-            remain = remain + len - fed;
-            pnt += len;
-        }
+        Serial.println("Failed to allocate buffer");
+        return 0;
     }
+    else
+    {
+        p->read(buf, fileBytes);
+        p->close();
+        uint32_t pnt = 0;
 
-    p->close();
+        if (pngle_feed(pngle, buff, fileBytes) < 0)
+            ret = 0;
+    }
     pngle_destroy(pngle);
+    if (buff)
+        free(buff);
     return ret;
 }
 
