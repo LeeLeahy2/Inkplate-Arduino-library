@@ -24,7 +24,7 @@
 
 uint8_t sectorBuffer[512] __attribute__ ((aligned (4)));
 uint32_t cardSectorCount = 0;
-SdCard * m_card = nullptr;
+SdCard * sdCard = nullptr;
 
 //----------------------------------------
 // SD card copy the network files
@@ -447,24 +447,24 @@ void sdCardDisplayFileInfoTableHeader(uint32_t fileCount)
 //----------------------------------------
 void sdCardErrorHalt()
 {
-    if (!m_card)
+    if (!sdCard)
     {
         Serial.println("ERROR: Invalid SD_CONFIG");
     }
-    else if (m_card->errorCode())
+    else if (sdCard->errorCode())
     {
-        if (m_card->errorCode() == SD_CARD_ERROR_CMD0)
+        if (sdCard->errorCode() == SD_CARD_ERROR_CMD0)
         {
             Serial.println("ERROR: No card, wrong chip select pin, or wiring error?");
         }
-        uint8_t errorCode = m_card->errorCode();
+        uint8_t errorCode = sdCard->errorCode();
         Serial.printf("SD errorCode = 0x%08x, ", errorCode);
         printSdErrorSymbol(&Serial, errorCode);
         Serial.print(", ");
         printSdErrorText(&Serial, errorCode);
         Serial.println();
 
-        Serial.printf("SD errorData = %d\r\n", m_card->errorData());
+        Serial.printf("SD errorData = %d\r\n", sdCard->errorData());
     }
     while (true)
     {
@@ -491,7 +491,7 @@ bool sdCardEraseCard()
         {
             lastBlock = cardSectorCount - 1;
         }
-        if (!m_card->erase(firstBlock, lastBlock))
+        if (!sdCard->erase(firstBlock, lastBlock))
         {
             Serial.println("ERROR: erase failed");
             sdCardErrorHalt();
@@ -505,7 +505,7 @@ bool sdCardEraseCard()
     } while (firstBlock < cardSectorCount);
     Serial.println();
 
-    if (!m_card->readSector(0, sectorBuffer))
+    if (!sdCard->readSector(0, sectorBuffer))
     {
         Serial.println("ERROR: readBlock");
         sdCardErrorHalt();
@@ -521,9 +521,14 @@ bool sdCardEraseCard()
 //----------------------------------------
 bool sdCardDisplayImage(Print * debugPrint)
 {
+    uint64_t deltaBytes;
+    uint64_t gBytes;
+    uint64_t mBytes;
+    uint64_t sdCardBytes;
+    uint32_t sectorCount;
     bool success;
 
-    do
+    do      // Single exit point
     {
         success = true;
 
@@ -534,30 +539,30 @@ bool sdCardDisplayImage(Print * debugPrint)
             success = false;
             break;
         }
-        if (debugPrint)
-            debugPrint->println("SD card online");
+
+        // Get the SD card object
+        sdCard = display.getSdFat().card();
+
+        do      // Discontinue use of SD card
+        {
+            // Display the SD card size
+            sectorCount = sdCard->sectorCount();
+            sdCardBytes = sectorCount * 512ull;
+            gBytes = (sdCardBytes + (512ull * 1000ull * 1000ull)) / (1000ull * 1000ull * 1000ull);
+            Serial.printf("%lldGB SD card\r\n", gBytes, mBytes);
+            if (debugPrint)
+            {
+                gBytes = sdCardBytes / (1000ull * 1000ull * 1000ull);
+                deltaBytes = sdCardBytes - (gBytes * 1000ull * 1000ull * 1000ull);
+                mBytes = deltaBytes / (1000ull * 1000ull);
+                Serial.printf("Actual SD card size: %lld.%03lldGB\r\n", gBytes, mBytes);
+            }
 
 /*
-static SdCardFactory cardFactory;
 ExFatFormatter exFatFormatter;
 FatFormatter fatFormatter;
-#define SD_CONFIG SdSpiConfig(10, SHARED_SPI, SD_SCK_MHZ(25))
 
-Serial.println("Configuring the SD card\r\n");
-m_card = cardFactory.newCard(SD_CONFIG);
-uint32_t sectorCount = m_card->sectorCount();
-uint64_t sdCardBytes = sectorCount * 512ull;
-Serial.printf("SD card sector count: %ld\r\n", sectorCount);
-uint64_t gBytes = sdCardBytes / (1000ull * 1000ull * 1000ull);
-uint64_t deltaBytes = sdCardBytes - (gBytes * 1000ull * 1000ull * 1000ull);
-uint64_t mBytes = deltaBytes / (1000ull * 1000ull);
-Serial.printf("sdCardBytes: %13lld\r\n", sdCardBytes);
-Serial.printf("deltaBytes: %13lld\r\n", deltaBytes);
-Serial.printf("gBytes: %13lld\r\n", gBytes);
-Serial.printf("mBytes: %13lld\r\n", mBytes);
-Serial.printf("SD card size: %lld.%03lld GB\r\n", gBytes, mBytes);
-
-if (!m_card || m_card->errorCode())
+if (!sdCard || sdCard->errorCode())
 success = false;
 if (success)
 {
@@ -568,8 +573,8 @@ if (success)
 Serial.println("Formatting the SD card");
 // Format exFAT if larger than 32GB.
 success = cardSectorCount > 67108864
-? exFatFormatter.format(m_card, sectorBuffer, &Serial)
-: fatFormatter.format(m_card, sectorBuffer, &Serial);
+? exFatFormatter.format(sdCard, sectorBuffer, &Serial)
+: fatFormatter.format(sdCard, sectorBuffer, &Serial);
 }
 }
 
@@ -584,22 +589,26 @@ while (success == false)
 //reportHeapNow(false);
 //sdCardDeleteDirectory("/", true, &Serial);
 reportHeapNow(false);
-        // Determine if the files should be updated
-        bool csvExists = display.getSdFat().exists(CSV_FILE);
-        if (((imageNumber % 12) == 0) || (csvExists == false))
-            NetworkCopyFilesToSdCard(NETWORK_TIMEOUT, &Serial);
+            // Determine if the files should be updated
+            bool csvExists = display.getSdFat().exists(CSV_FILE);
+            if (((imageNumber % 12) == 0) || (csvExists == false))
+                NetworkCopyFilesToSdCard(NETWORK_TIMEOUT, &Serial);
 
-        // Determine if the .CSV file exists
-        if (csvExists == false)
-        {
-            // Display the file from the network
-            Serial.println("CSV file not found on SD card");
-            success = false;
-            break;
-        }
+            // Determine if the .CSV file exists
+            if (csvExists == false)
+            {
+                // Display the file from the network
+                Serial.println("CSV file not found on SD card");
+                success = false;
+                break;
+            }
 
-        // Read the Pictures.csv file
-        success = sdCardReadPicturesCsvFile(sdCardSelectFile, &Serial);
+            // Read the Pictures.csv file
+            success = sdCardReadPicturesCsvFile(sdCardSelectFile, &Serial);
+        } while (0);
+
+        // Done using SD card
+        display.sdCardSleep();
 
 
 
