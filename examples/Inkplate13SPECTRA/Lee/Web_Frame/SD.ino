@@ -26,55 +26,6 @@ uint8_t sectorBuffer[512] __attribute__ ((aligned (4)));
 uint32_t cardSectorCount = 0;
 SdCard * m_card = nullptr;
 
-#if 0
-setup:
-    determine if SD card available
-    if (sd card available)
-    {
-        determine if USB is connected
-        get load date from RTC
-        if (current date != load date) || (.csv does not exist on SD card)
-        {
-            start network
-            read .csv file
-            copy it to SD card
-            save load date to RTC
-            get total files from RTC
-            for each entry in the .csv file
-            {
-                if (file does not exist on SD card)
-                {
-                    read file from network
-                    Save file to SD card
-                    Add one to total files
-                }
-            }
-            save total files to RTC
-        }
-        if (.csv file on SD card)
-            displayImageFromSdCard()
-        else
-            displayImageFromNetwork();
-    }
-    else
-        displayImageFromNetwork();
-    generate new random number
-    save random number in rtc
-    enable wakeup_push_button
-    enable wakeup_timer(15 minutes)
-    deep sleep
-
-displayImageFromSdCard()
-{
-    read .csv file from SD card
-    get random number from RTC
-    get total files from RTC
-    choose image file from .csv file
-    display that image
-}
-
-#endif // 0
-
 //----------------------------------------
 // SD card copy the network files
 //----------------------------------------
