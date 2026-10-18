@@ -14,6 +14,8 @@
 // Constants
 //----------------------------------------
 
+#define CSV_FILE        "Pictures.csv"
+
 #define STR_CMP         strcasecmp
 
 //----------------------------------------
@@ -281,7 +283,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
         if (success)
         {
             FsFile file;
-            if (!file.open("Pictures.csv", O_RDWR | O_CREAT | O_TRUNC))
+            if (!file.open(CSV_FILE, O_RDWR | O_CREAT | O_TRUNC))
             {
                 Serial.printf("Error opening %s\r\n", entry->_filePath);
                 success = false;
@@ -632,11 +634,12 @@ while (success == false)
 //sdCardDeleteDirectory("/", true, &Serial);
 reportHeapNow(false);
         // Determine if the files should be updated
-        if (((imageNumber % 12) == 0) || display.getSdFat().exists("Pictures.csv"))
+        bool csvExists = display.getSdFat().exists(CSV_FILE);
+        if (((imageNumber % 12) == 0) || (csvExists == false))
             NetworkCopyFilesToSdCard(NETWORK_TIMEOUT, &Serial);
 
         // Determine if the .CSV file exists
-        if (display.getSdFat().exists("Pictures.csv") == false)
+        if (csvExists == false)
         {
             // Display the file from the network
             Serial.println("CSV file not found on SD card");
@@ -672,7 +675,7 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
     CSV_ENTRY * csvTable;
     CSV_ENTRY * csvTemp;
     size_t fileBytes;
-    const char * filePath = "Pictures.csv";
+    const char * filePath = CSV_FILE;
     size_t remainingBytes;
     bool success;
     const char * url;
