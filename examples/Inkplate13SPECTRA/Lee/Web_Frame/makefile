@@ -171,9 +171,6 @@ core-update:
 #DEBUG_LEVEL=error
 DEBUG_LEVEL=none
 
-#DEBUG_SERIAL=&Serial
-DEBUG_SERIAL=nullptr
-
 $(BIN_FILE):	$(SKETCH).ino   *.ino   *.h   makefile
 	@$(CLEAR)
 	@echo "------------------------- $(OS_NAME) ---------------------------------------------"
@@ -182,7 +179,6 @@ $(BIN_FILE):	$(SKETCH).ino   *.ino   *.h   makefile
 		compile  \
 		--fqbn   "$(BOARD_FQBN)":DebugLevel=$(DEBUG_LEVEL),PartitionScheme=$(PARTITION_FILE_NAME),FlashMode=qio,UploadSpeed=921600,EraseFlash=none  \
 		$<  \
-		--build-property "compiler.cpp.extra_flags=-c \"-DDEBUG_SERIAL=$(DEBUG_SERIAL)\""  \
 		--build-property build.partitions=$(PARTITION_FILE_NAME)  \
 		--build-property upload.maximum_size=3145728  \
 		--export-binaries

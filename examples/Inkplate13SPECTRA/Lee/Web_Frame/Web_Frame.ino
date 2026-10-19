@@ -55,7 +55,7 @@
 // Constants
 //----------------------------------------
 
-#define HEADER_LINE_COUNT               3
+#define HEADER_LINE_COUNT               5
 
 #define MICROSECONDS_IN_A_MILLISECOND   1000ull
 #define MILLISECONDS_IN_A_SECOND        1000ull
@@ -71,11 +71,14 @@
 // Globals
 //----------------------------------------
 
+Print * debugPrint;
 Inkplate display;
+
 volatile RTC_DATA_ATTR uint32_t imageNumber;    // Image number to display
 volatile RTC_DATA_ATTR uint16_t displayMinutes; // Image display time in minutes
 volatile RTC_DATA_ATTR uint16_t imagesBeforeCsvUpdate;  // Time between CSV file updates
                                                         // ~= displayMinutes * imagesBeforeCsvUpdate
+volatile RTC_DATA_ATTR bool debuggingEnabled;   // Enable or disable debugging output
 
 //----------------------------------------
 // Type declarations
@@ -97,8 +100,7 @@ typedef struct _CSV_CONTEXT
 
 // Callback routine to process lines of the CSV file
 typedef bool (* NETWORK_PROCESS_CSV_LINES)(const CSV_ENTRY * csvTable,
-                                           uint32_t lineCount,
-                                           Print * debugPrint);
+                                           uint32_t lineCount);
 
 // File information
 typedef struct _FILE_INFO
@@ -112,8 +114,7 @@ typedef struct _FILE_INFO
 // Callback routine to process files from directory listing
 typedef bool (* SD_CARD_PROCESS_FILES)(const FILE_INFO ** fileTable,
                                        uint32_t fileCount,
-                                       void * context,
-                                       Print * debugPrint);
+                                       void * context);
 
 //----------------------------------------
 // Starting point for the application
@@ -131,18 +132,23 @@ void setup()
     if (imagesBeforeCsvUpdate == 0)
         imagesBeforeCsvUpdate = 4;
 
+    // Select the debug serial output
+    debugPrint = debuggingEnabled ? &Serial : nullptr;
+
     // Initialize the display
     display.begin();
     display.setTextColor(INKPLATE_BLACK);
 
     // Display an image from the SD card or the network
-    if (sdCardDisplayImage(DEBUG_SERIAL) == false)
-        networkDisplayImage(NETWORK_TIMEOUT, DEBUG_SERIAL);
+    if (sdCardDisplayImage() == false)
+        networkDisplayImage(NETWORK_TIMEOUT);
 
     // Display the parameters
     Serial.printf("Image: %d\r\n");
     Serial.printf("displayMinutes: %d\r\n", displayMinutes);
     Serial.printf("imagesBeforeCsvUpdate: %d\r\n", imagesBeforeCsvUpdate);
+
+    // Display the time to next CSV update
     uint32_t minutes = (uint32_t)displayMinutes
                      * (uint32_t)(imagesBeforeCsvUpdate - (imageNumber % imagesBeforeCsvUpdate));
     uint32_t hours = minutes / 60;

@@ -13,14 +13,12 @@
 //----------------------------------------
 // SD card copy the network files
 //----------------------------------------
-bool NetworkCopyFilesToSdCard(uint32_t timeout, Print * debugPrint)
+bool NetworkCopyFilesToSdCard(uint32_t timeout)
 {
     bool success;
 
     // Load, parse and sort the CSV file
-    success = networkReadCsvFile(sdCardCopyNetworkFiles,
-                                 timeout,
-                                 debugPrint);
+    success = networkReadCsvFile(sdCardCopyNetworkFiles, timeout);
     if (debugPrint)
         debugPrint->printf("NetworkCopyFilesToSdCard returning %d\r\n", success);
     return success;
@@ -29,21 +27,19 @@ bool NetworkCopyFilesToSdCard(uint32_t timeout, Print * debugPrint)
 //----------------------------------------
 // Display an image from the network
 //----------------------------------------
-bool networkDisplayImage(uint32_t timeout, Print * debugPrint)
+bool networkDisplayImage(uint32_t timeout)
 {
     bool success;
 
     // Load, parse and sort the CSV file
-    success = networkReadCsvFile(networkSelectImage,
-                                 timeout,
-                                 debugPrint);
+    success = networkReadCsvFile(networkSelectImage, timeout);
     return success;
 }
 
 //----------------------------------------
 // Display the contents of the URL
 //----------------------------------------
-bool networkDisplayUrl(const char * url, Print * debugPrint)
+bool networkDisplayUrl(const char * url)
 {
     bool success;
 
@@ -86,9 +82,7 @@ bool networkDisplayUrl(const char * url, Print * debugPrint)
 //----------------------------------------
 // Read the CSV file from the network
 //----------------------------------------
-bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
-                        uint32_t timeout,
-                        Print * debugPrint)
+bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout)
 {
     char * csvData;
     CSV_ENTRY * csvEntry;
@@ -114,8 +108,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         if (networkServerConnectUsingUrl(csvFileUrl,
                                          csvStream,
                                          https,
-                                         fileBytes,
-                                         debugPrint) == false)
+                                         fileBytes) == false)
         {
             break;
         }
@@ -266,7 +259,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
 
         // Process the CSV file
         if (processLines)
-            success = processLines(csvTable, lineCount, debugPrint);
+            success = processLines(csvTable, lineCount);
     } while (0);
 
     // Release the resources
@@ -337,7 +330,7 @@ String networkGetServerFromUrl(const char * url)
 //----------------------------------------
 // Get an IP address associated with server
 //----------------------------------------
-String networkGetServerIpAddress(const char * server, Print * debugPrint)
+String networkGetServerIpAddress(const char * server)
 {
     struct addrinfo hints, * res, * p;
     char ipstr[INET6_ADDRSTRLEN];
@@ -393,9 +386,7 @@ String networkGetServerIpAddress(const char * server, Print * debugPrint)
 //----------------------------------------
 // Select and display an image from the network
 //----------------------------------------
-bool networkSelectImage(const CSV_ENTRY * csvTable,
-                        uint32_t lineCount,
-                        Print * debugPrint)
+bool networkSelectImage(const CSV_ENTRY * csvTable, uint32_t lineCount)
 {
     const CSV_ENTRY * entry;
     uint32_t lineNumber;
@@ -405,12 +396,15 @@ bool networkSelectImage(const CSV_ENTRY * csvTable,
     //------------------------------------------------------
     // The CSV file contains:
     //
-    //      Display Minutes,Displayed Files Before CSV File Update
-    //      minutes,file count
-    //      SD_Card_File_Name,Network_Path
-    //      file_1,url_1
-    //      file_2,url_3
-    //         ***
+    //  Line    Description
+    //    1     Display Minutes,Displayed Files Before CSV File Update
+    //    2     minutes,file count
+    //    3     SD_Card_File_Name,Network_Path
+    //    4     Debug enable=1 disable=0,Not Used
+    //    5     debugEnable,reserved
+    //    6     file_1,url_1
+    //    7     file_2,url_3
+    //    n     ***
     //------------------------------------------------------
 
     // Update the image display time
@@ -442,6 +436,21 @@ bool networkSelectImage(const CSV_ENTRY * csvTable,
     if (debugPrint)
         debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
 
+    // Update debugEnable
+    entry = &csvTable[3];
+    if (debugPrint)
+        debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
+    if (sscanf(entry->_filePath, "%d", &temp) != 1)
+    {
+        Serial.println("ERROR: Failed to update debugEnable");
+        return false;
+    }
+    u16 = debuggingEnabled;
+    debuggingEnabled = (bool)temp;
+    debugPrint = debuggingEnabled ? &Serial : nullptr;
+    if (debuggingEnabled != u16)
+        Serial.printf("debugEnable: %d --> %d\r\n", u16, debuggingEnabled);
+
     // Select a line in the file
     lineNumber = imageNumber % (lineCount - HEADER_LINE_COUNT);
 
@@ -453,7 +462,7 @@ bool networkSelectImage(const CSV_ENTRY * csvTable,
 
     // Display the image
     Serial.printf("Selected URL: %s\r\n", url);
-    return networkDisplayUrl(url, debugPrint);
+    return networkDisplayUrl(url);
 }
 
 //----------------------------------------
@@ -463,8 +472,7 @@ bool networkSelectImage(const CSV_ENTRY * csvTable,
 bool networkServerConnectUsingUrl(const char * url,
                                   NetworkClient * &stream,
                                   HTTPClient &https,
-                                  size_t &fileBytes,
-                                  Print * debugPrint)
+                                  size_t &fileBytes)
 {
     int attempt;
     const t_http_codes expectedResponseCode = HTTP_CODE_OK;
@@ -488,7 +496,7 @@ bool networkServerConnectUsingUrl(const char * url,
         const char * server = serverString.c_str();
 
         // Translate the server name into an IP address
-        String ipAddressString = networkGetServerIpAddress(server, debugPrint);
+        String ipAddressString = networkGetServerIpAddress(server);
         if (ipAddressString.length() == 0)
         {
             Serial.println("Failed to get the IP address for the server");

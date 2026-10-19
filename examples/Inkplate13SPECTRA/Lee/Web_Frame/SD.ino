@@ -31,8 +31,7 @@ SdCard * sdCard = nullptr;
 //----------------------------------------
 bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                                        uint32_t fileCount,
-                                       void * context,
-                                       Print * debugPrint)
+                                       void * context)
 {
     const CSV_CONTEXT * csvContext;
     const CSV_ENTRY * csvTable;
@@ -93,12 +92,15 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
         //------------------------------------------------------
         // The CSV file contains:
         //
-        //      Display Minutes,Displayed Files Before CSV File Update
-        //      minutes,file count
-        //      SD_Card_File_Name,Network_Path
-        //      file_1,url_1
-        //      file_2,url_3
-        //         ***
+        //  Line    Description
+        //    1     Display Minutes,Displayed Files Before CSV File Update
+        //    2     minutes,file count
+        //    3     SD_Card_File_Name,Network_Path
+        //    4     Debug enable=1 disable=0,Not Used
+        //    5     debugEnable,reserved
+        //    6     file_1,url_1
+        //    7     file_2,url_3
+        //    n     ***
         //------------------------------------------------------
 
         // Update the image display time
@@ -129,6 +131,21 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
         imagesBeforeCsvUpdate = (uint16_t)temp;
         if (debugPrint)
             debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
+
+        // Update debugEnable
+        entry = &csvTable[3];
+        if (debugPrint)
+            debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
+        if (sscanf(entry->_filePath, "%d", &temp) != 1)
+        {
+            Serial.println("ERROR: Failed to update debugEnable");
+            return false;
+        }
+        u16 = debuggingEnabled;
+        debuggingEnabled = (bool)temp;
+        debugPrint = debuggingEnabled ? &Serial : nullptr;
+        if (debuggingEnabled != u16)
+            Serial.printf("debugEnable: %d --> %d\r\n", u16, debuggingEnabled);
 
         // Walk the list of files
         fileNumber = 0;
@@ -165,8 +182,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                     if (networkServerConnectUsingUrl(entry->_url,
                                                      dataStream,
                                                      https,
-                                                     fileBytes,
-                                                     debugPrint) == false)
+                                                     fileBytes) == false)
                     {
                         success = false;
                         break;
@@ -295,12 +311,15 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                 //------------------------------------------------------
                 // The CSV file contains:
                 //
-                //      Display Minutes,Displayed Files Before CSV File Update
-                //      minutes,file count
-                //      SD_Card_File_Name,Network_Path
-                //      file_1,url_1
-                //      file_2,url_3
-                //         ***
+                //  Line    Description
+                //    1     Display Minutes,Displayed Files Before CSV File Update
+                //    2     minutes,file count
+                //    3     SD_Card_File_Name,Network_Path
+                //    4     Debug enable=1 disable=0,Not Used
+                //    5     debugEnable,reserved
+                //    6     file_1,url_1
+                //    7     file_2,url_3
+                //    n     ***
                 //------------------------------------------------------
 
                 // Add display minutes,files before update header
@@ -325,6 +344,24 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
 
                 // Add the file,url header line
                 bytesWritten = file.printf("SD_Card_File_Name,Network_Path\n");
+                if (bytesWritten < 0)
+                {
+                    Serial.println("ERROR: Failed to write to SD card!");
+                    success = false;
+                    break;
+                }
+
+                // Add the debugging header line
+                bytesWritten = file.printf("Debug enable=1 disable=0,Not Used\n");
+                if (bytesWritten < 0)
+                {
+                    Serial.println("ERROR: Failed to write to SD card!");
+                    success = false;
+                    break;
+                }
+
+                // Add the debuggingEnabled line
+                bytesWritten = file.printf("%d,0\n", debuggingEnabled);
                 if (bytesWritten < 0)
                 {
                     Serial.println("ERROR: Failed to write to SD card!");
@@ -370,9 +407,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
 //----------------------------------------
 // Copy files from the network to the SD card
 //----------------------------------------
-bool sdCardCopyNetworkFiles(const CSV_ENTRY * csvTable,
-                            uint32_t lineCount,
-                            Print * debugPrint)
+bool sdCardCopyNetworkFiles(const CSV_ENTRY * csvTable, uint32_t lineCount)
 {
     CSV_CONTEXT csvContext;
     bool success;
@@ -385,8 +420,7 @@ bool sdCardCopyNetworkFiles(const CSV_ENTRY * csvTable,
     success = sdCardWalkDirectory("/",
                                   true,
                                   sdCardCompareFiles,
-                                  (void *)&csvContext,
-                                  debugPrint);
+                                  (void *)&csvContext);
     if (debugPrint)
         debugPrint->printf("sdCardCopyNetworkFiles returning %d\r\n", success);
     return success;
@@ -395,17 +429,16 @@ bool sdCardCopyNetworkFiles(const CSV_ENTRY * csvTable,
 //----------------------------------------
 // SD card delete directory or directory tree
 //----------------------------------------
-bool sdCardDeleteDirectory(const char * path, bool walkTree, Print * debugPrint)
+bool sdCardDeleteDirectory(const char * path, bool walkTree)
 {
     bool success;
 
     success =  sdCardWalkDirectory(path,
                                    walkTree,
                                    sdCardDeleteFile,
-                                   nullptr,
-                                   debugPrint);
+                                   nullptr);
     if ((success == false) && debugPrint)
-        sdCardDirectoryListing(path, walkTree, debugPrint);
+        sdCardDirectoryListing(path, walkTree);
     return success;
 }
 
@@ -414,8 +447,7 @@ bool sdCardDeleteDirectory(const char * path, bool walkTree, Print * debugPrint)
 //----------------------------------------
 bool sdCardDeleteFile(const FILE_INFO ** fileTable,
                       uint32_t fileCount,
-                      void * context,
-                      Print * debugPrint)
+                      void * context)
 {
     char * filePath;
     SdFile sdRootDir;
@@ -481,8 +513,7 @@ bool sdCardDeleteFile(const FILE_INFO ** fileTable,
 //----------------------------------------
 bool sdCardDirectoryListFiles(const FILE_INFO ** fileTable,
                               uint32_t fileCount,
-                              void * context,
-                              Print * debugPrint)
+                              void * context)
 {
     // Display the directory listing
     sdCardDisplayFileInfoTableHeader(fileCount);
@@ -494,13 +525,12 @@ bool sdCardDirectoryListFiles(const FILE_INFO ** fileTable,
 //----------------------------------------
 // SD card directory listing
 //----------------------------------------
-bool sdCardDirectoryListing(const char * path, bool walkTree, Print * debugPrint)
+bool sdCardDirectoryListing(const char * path, bool walkTree)
 {
     return sdCardWalkDirectory(path,
                                walkTree,
                                sdCardDirectoryListFiles,
-                               nullptr,
-                               debugPrint);
+                               nullptr);
 }
 
 //----------------------------------------
@@ -611,7 +641,7 @@ bool sdCardEraseCard()
 //----------------------------------------
 // Display an image from the SD card
 //----------------------------------------
-bool sdCardDisplayImage(Print * debugPrint)
+bool sdCardDisplayImage()
 {
     uint64_t deltaBytes;
     uint64_t gBytes;
@@ -653,7 +683,7 @@ bool sdCardDisplayImage(Print * debugPrint)
             // Determine if the files should be updated
             bool csvExists = display.getSdFat().exists(CSV_FILE);
             if (((imageNumber % imagesBeforeCsvUpdate) == 0) || (csvExists == false))
-                NetworkCopyFilesToSdCard(NETWORK_TIMEOUT, DEBUG_SERIAL);
+                NetworkCopyFilesToSdCard(NETWORK_TIMEOUT);
 
             // Determine if the .CSV file exists
             if (csvExists == false)
@@ -665,7 +695,7 @@ bool sdCardDisplayImage(Print * debugPrint)
             }
 
             // Read the Pictures.csv file
-            success = sdCardReadPicturesCsvFile(sdCardSelectFile, DEBUG_SERIAL);
+            success = sdCardReadPicturesCsvFile(sdCardSelectFile);
         } while (0);
 
         // Done using SD card
@@ -679,8 +709,7 @@ bool sdCardDisplayImage(Print * debugPrint)
 //----------------------------------------
 // Read the CSV file from the network
 //----------------------------------------
-bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
-                               Print * debugPrint)
+bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines)
 {
     char * csvData;
     CSV_ENTRY * csvEntry;
@@ -833,7 +862,7 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
 
         // Process the CSV file
         if (processLines)
-            success = processLines(csvTable, lineCount, debugPrint);
+            success = processLines(csvTable, lineCount);
     } while (0);
 
     // Release the resources
@@ -850,9 +879,7 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
 //----------------------------------------
 // Select and display an image from the network
 //----------------------------------------
-bool sdCardSelectFile(const CSV_ENTRY * csvTable,
-                      uint32_t lineCount,
-                      Print * debugPrint)
+bool sdCardSelectFile(const CSV_ENTRY * csvTable, uint32_t lineCount)
 {
     const char * filePath;
     uint32_t lineNumber;
@@ -869,7 +896,7 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable,
 
     // Display the image
     Serial.printf("Selected file: %s\r\n", filePath);
-    success = sdCardDisplayFile(filePath, debugPrint);
+    success = sdCardDisplayFile(filePath);
     if (debugPrint)
         debugPrint->printf("sdCardSelectFile returning %d\r\n", success);
     return success;
@@ -878,7 +905,7 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable,
 //----------------------------------------
 // Display the contents of the URL
 //----------------------------------------
-bool sdCardDisplayFile(const char * filePath, Print * debugPrint)
+bool sdCardDisplayFile(const char * filePath)
 {
     SdFile file;
     bool success;
@@ -943,8 +970,7 @@ bool sdCardFormat()
 bool sdCardWalkDirectory(const char * path,
                          bool walkTree,
                          SD_CARD_PROCESS_FILES processFiles,
-                         void * context,
-                         Print * debugPrint)
+                         void * context)
 {
     uint32_t fileCount;
     FILE_INFO * fileList;
@@ -958,8 +984,7 @@ bool sdCardWalkDirectory(const char * path,
                                       fileList,
                                       walkTree,
                                       processFiles,
-                                      context,
-                                      debugPrint);
+                                      context);
     if (success)
     {
         fileCount = 0;
@@ -1011,7 +1036,7 @@ bool sdCardWalkDirectory(const char * path,
 
         // Process the directory listing
         if (processFiles)
-            success = processFiles((const FILE_INFO **)fileTable, fileCount, context, debugPrint);
+            success = processFiles((const FILE_INFO **)fileTable, fileCount, context);
     }
 
     // Free the file table
@@ -1035,8 +1060,7 @@ bool sdCardWalkDirectoryTree(const char * path,
                              FILE_INFO * &fileList,
                              bool walkTree,
                              SD_CARD_PROCESS_FILES processFiles,
-                             void * context,
-                             Print * debugPrint)
+                             void * context)
 {
     bool directory;
     FILE_INFO * fileInfo;
@@ -1103,8 +1127,7 @@ bool sdCardWalkDirectoryTree(const char * path,
                                             fileList,
                                             walkTree,
                                             processFiles,
-                                            context,
-                                            debugPrint) == false)
+                                            context) == false)
                 {
                     success = false;
                     break;
