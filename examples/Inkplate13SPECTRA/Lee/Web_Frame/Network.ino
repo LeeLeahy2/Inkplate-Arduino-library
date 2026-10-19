@@ -45,7 +45,7 @@ reportHeapNow(false);
 //----------------------------------------
 // Display the contents of the URL
 //----------------------------------------
-bool networkDisplayUrl(const char * url)
+bool networkDisplayUrl(const char * url, Print * debugPrint)
 {
     bool success;
 
@@ -80,6 +80,8 @@ bool networkDisplayUrl(const char * url)
     // Display the image
     if (success)
         display.display();
+    if (debugPrint)
+        debugPrint->printf("networkDisplayUrl returning %d\r\n", success);
     return success;
 }
 
@@ -415,7 +417,7 @@ bool networkSelectImage(const CSV_ENTRY * csvTable,
     url = csvTable[lineNumber]._url;
 
     // Display the image
-    return networkDisplayUrl(url);
+    return networkDisplayUrl(url, debugPrint);
 }
 
 //----------------------------------------

@@ -838,7 +838,7 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable,
     filePath = csvTable[lineNumber]._filePath;
 
     // Display the image
-    success = sdCardDisplayFile(filePath);
+    success = sdCardDisplayFile(filePath, debugPrint);
     if (debugPrint)
         debugPrint->printf("sdCardSelectFile returning %d\r\n", success);
     return success;
@@ -847,7 +847,7 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable,
 //----------------------------------------
 // Display the contents of the URL
 //----------------------------------------
-bool sdCardDisplayFile(const char * filePath)
+bool sdCardDisplayFile(const char * filePath, Print * debugPrint)
 {
     SdFile file;
     bool success;
@@ -894,7 +894,8 @@ bool sdCardDisplayFile(const char * filePath)
         // Done with the file
         file.close();
     }
-    Serial.printf("sdCardDisplayFile returning %d\r\n", success);
+    if (debugPrint)
+        debugPrint->printf("sdCardDisplayFile returning %d\r\n", success);
     return success;
 }
 
