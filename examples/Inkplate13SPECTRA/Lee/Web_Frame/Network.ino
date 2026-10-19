@@ -134,6 +134,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         csvData[fileBytes] = 0;
 
         // Read the .CSV file
+        Serial.println("Reading CSV file from network");
         char * data = csvData;
         char * dataEnd = &data[fileBytes];
         uint32_t timerStart = millis();
@@ -411,6 +412,7 @@ bool networkSelectImage(const CSV_ENTRY * csvTable,
     url = csvTable[lineNumber]._url;
 
     // Display the image
+    Serial.printf("Selected URL: %s\r\n", url);
     return networkDisplayUrl(url, debugPrint);
 }
 

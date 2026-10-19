@@ -10,11 +10,19 @@
  * @date        2026-10-16
  **************************************************/
 
+//----------------------------------------
+// Constants
+//----------------------------------------
+
 #define STR_CMP         strcasecmp
+
+//----------------------------------------
+// Globals
+//----------------------------------------
 
 uint8_t sectorBuffer[512] __attribute__ ((aligned (4)));
 uint32_t cardSectorCount = 0;
-SdCard* m_card = nullptr;
+SdCard * m_card = nullptr;
 
 #if 0
 setup:
@@ -75,6 +83,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
 {
     const CSV_CONTEXT * csvContext;
     const CSV_ENTRY * csvTable;
+    bool displayHeader;
     const CSV_ENTRY * entry;
     const FILE_INFO * fileInfo;
     uint32_t fileNumber;
@@ -83,6 +92,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
     bool success;
 
     // Expand the context
+    displayHeader = true;
     success = true;
     csvContext = (CSV_CONTEXT *)context;
     csvTable = csvContext->_csvTable;
@@ -118,6 +128,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
     // Copy the files to the SD card
     if (lineCount)
     {
+        Serial.println("Verifying files are on SD card");
         // Walk the list of files
         fileNumber = 0;
         lineNumber = 1;
@@ -172,8 +183,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                     }
 
                     // Display the file copy
-                    if (debugPrint)
-                        debugPrint->printf("Copy %s -> %s\r\n", entry->_url, entry->_filePath);
+                    Serial.printf("Copy %s -> %s\r\n", entry->_url, entry->_filePath);
 
                     // Open the file on the SD card
                     if (!file.open(entry->_filePath, O_RDWR | O_CREAT | O_TRUNC))
@@ -185,6 +195,13 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
 
                     do      // Close file upon exit
                     {
+                        // Display the header
+                        if (displayHeader)
+                        {
+                            Serial.println("Copying file to the SD card");
+                            displayHeader = false;
+                        }
+
                         // Write content to the file
                         Serial.printf("Writing to %s...\r\n", entry->_filePath);
                         static char buffer[16384];
@@ -274,6 +291,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                 // Add the CSV file to the SD card
                 lineNumber = 1;
                 entry = &csvTable[lineNumber];
+                Serial.println("Found CSV file on SD card");
 
                 // Rebuild the contents of the .CSV file
                 while (entry)
@@ -540,7 +558,7 @@ bool sdCardEraseCard()
         sdCardErrorHalt();
     }
     success = true;
-    Serial.printf("All data set to  0x%02x\r\n", sectorBuffer[0]);
+    Serial.printf("All data set to 0x%02x\r\n", sectorBuffer[0]);
     Serial.println("Erase done");
     return success;
 }
@@ -621,6 +639,7 @@ reportHeapNow(false);
         if (display.getSdFat().exists("Pictures.csv") == false)
         {
             // Display the file from the network
+            Serial.println("CSV file not found on SD card");
             success = false;
             break;
         }
@@ -673,6 +692,7 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         }
 
         // Allocate space for the CSV file
+        Serial.println("CSV file on SD card");
         fileBytes = (size_t)csvFile.fileSize();
         csvData = (char *)malloc(fileBytes + 1);
         if (csvData == nullptr)
@@ -832,6 +852,7 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable,
     filePath = csvTable[lineNumber]._filePath;
 
     // Display the image
+    Serial.printf("Selected file: %s\r\n", filePath);
     success = sdCardDisplayFile(filePath, debugPrint);
     if (debugPrint)
         debugPrint->printf("sdCardSelectFile returning %d\r\n", success);
