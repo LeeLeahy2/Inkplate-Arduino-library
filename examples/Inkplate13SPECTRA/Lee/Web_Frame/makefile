@@ -115,7 +115,7 @@ DIR_LISTING=ls
 TERMINAL_APP=minicom
 
 TERMINAL_PORT=/dev/ttyUSB0
-TERMINAL_PARAMS=-b 115200 -8 < /dev/tty
+TERMINAL_PARAMS=-b 115200   -8   --wrap   < /dev/tty
 
 endif
 endif
