@@ -143,7 +143,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                 HTTPClient https;
 
                 // Copy the file to the SD card
-                do
+                do      // Break web server connection upon exit
                 {
                     // Attempt to open the network file
                     if (networkServerConnectUsingUrl(entry->_url,
@@ -180,72 +180,75 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                         break;
                     }
 
-                    // Write content to the file
-                    Serial.printf("Writing to %s...\r\n", entry->_filePath);
-                    static char buffer[16384];
-                    size_t bytesRemaining = fileBytes;
-                    uint32_t timerStart = millis();
-                    while (bytesRemaining)
+                    do      // Close file upon exit
                     {
-                        // Wait for some data
-                        size_t bytesToRead = dataStream->available();
-                        if (bytesToRead == 0)
+                        // Write content to the file
+                        Serial.printf("Writing to %s...\r\n", entry->_filePath);
+                        static char buffer[16384];
+                        size_t bytesRemaining = fileBytes;
+                        uint32_t timerStart = millis();
+                        while (bytesRemaining)
                         {
-                            // Check for timeout
-                            if ((millis() - timerStart) > DATA_TIMEOUT)
+                            // Wait for some data
+                            size_t bytesToRead = dataStream->available();
+                            if (bytesToRead == 0)
+                            {
+                                // Check for timeout
+                                if ((millis() - timerStart) > DATA_TIMEOUT)
+                                {
+                                    if (debugPrint)
+                                        debugPrint->printf("ERROR: Timed out reading .CSV file\r\n", entry->_filePath);
+                                    success = false;
+                                    break;
+                                }
+                                delay(1);
+                                continue;
+                            }
+
+                            // Read data into the buffer
+                            bytesToRead = min(bytesToRead, sizeof(buffer));
+                            ssize_t bytesRead = dataStream->read((uint8_t *)buffer, bytesToRead);
+                            if (bytesRead < 0)
                             {
                                 if (debugPrint)
-                                    debugPrint->printf("ERROR: Timed out reading .CSV file\r\n", entry->_filePath);
+                                    debugPrint->printf("ERROR: Failed to read %s\r\n", entry->_filePath);
                                 success = false;
                                 break;
                             }
-                            delay(1);
-                            continue;
+
+                            // Write the data to the SD card
+                            ssize_t bytesWritten = file.write((uint8_t *)buffer, bytesRead);
+                            if (bytesWritten < 0)
+                            {
+                                if (debugPrint)
+                                    debugPrint->println("ERROR: Failed to write to SD card!");
+                                break;
+                            }
+
+                            // Account for this data
+                            bytesRemaining -= bytesRead;
                         }
 
-                        // Read data into the buffer
-                        bytesToRead = min(bytesToRead, sizeof(buffer));
-                        ssize_t bytesRead = dataStream->read((uint8_t *)buffer, bytesToRead);
-                        if (bytesRead < 0)
+                        // Delete the file upon error
+                        if (bytesRemaining || (file.fileSize() != fileBytes))
                         {
                             if (debugPrint)
-                                debugPrint->printf("ERROR: Failed to read %s\r\n", entry->_filePath);
-                            success = false;
+                            {
+                                if ((bytesRemaining == 0) && (file.fileSize() != fileBytes))
+                                    debugPrint->printf("Wrong file size, SD file size: %lld, expected %ld bytes\r\n",
+                                                       file.fileSize(), fileBytes);
+                                debugPrint->printf("Removing file : %s\r\n", entry->_filePath);
+                            }
+                            file.remove();
                             break;
                         }
-
-                        // Write the data to the SD card
-                        ssize_t bytesWritten = file.write((uint8_t *)buffer, bytesRead);
-                        if (bytesWritten < 0)
-                        {
-                            if (debugPrint)
-                                debugPrint->println("ERROR: Failed to write to SD card!");
-                            break;
-                        }
-
-                        // Account for this data
-                        bytesRemaining -= bytesRead;
-                    }
-
-                    // Delete the file upon error
-                    if (bytesRemaining || (file.fileSize() != fileBytes))
-                    {
                         if (debugPrint)
-                        {
-                            if ((bytesRemaining == 0) && (file.fileSize() != fileBytes))
-                                debugPrint->printf("Wrong file size, SD file size: %lld, expected %ld bytes\r\n",
-                                                   file.fileSize(), fileBytes);
-                            debugPrint->printf("Removing file : %s\r\n", entry->_filePath);
-                        }
-                        file.remove();
-                        break;
-                    }
-                    if (debugPrint)
-                        debugPrint->println("Done");
-                } while (0);
+                            debugPrint->println("Done");
+                    } while (0);
 
-                // Done with the file
-                file.close();
+                    // Done with the file
+                    file.close();
+                } while (0);
 
                 // Done with the web server
                 https.end();
