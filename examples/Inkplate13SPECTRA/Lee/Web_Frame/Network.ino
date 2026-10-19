@@ -21,7 +21,8 @@ bool NetworkCopyFilesToSdCard(uint32_t timeout, Print * debugPrint)
     success = networkReadCsvFile(sdCardCopyNetworkFiles,
                                  timeout,
                                  debugPrint);
-    Serial.printf("NetworkCopyFilesToSdCard returning %d\r\n", success);
+    if (debugPrint)
+        debugPrint->printf("NetworkCopyFilesToSdCard returning %d\r\n", success);
     return success;
 }
 
@@ -79,7 +80,6 @@ bool networkDisplayUrl(const char * url)
     // Display the image
     if (success)
         display.display();
-    Serial.printf("networkDisplayUrl returning %d\r\n", success);
     return success;
 }
 

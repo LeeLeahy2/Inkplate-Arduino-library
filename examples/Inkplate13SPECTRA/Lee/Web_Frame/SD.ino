@@ -297,7 +297,8 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
             }
         }
     }
-    Serial.printf("sdCardCompareFiles returning %d\r\n", success);
+    if (debugPrint)
+        debugPrint->printf("sdCardCompareFiles returning %d\r\n", success);
     return success;
 }
 
@@ -323,7 +324,8 @@ reportHeapNow(false);
                                   (void *)&csvContext,
                                   debugPrint);
 reportHeapNow(false);
-    Serial.printf("sdCardCopyNetworkFiles returning %d\r\n", success);
+    if (debugPrint)
+        debugPrint->printf("sdCardCopyNetworkFiles returning %d\r\n", success);
     return success;
 }
 
@@ -635,7 +637,8 @@ sdCardDirectoryListing("/", true, &Serial);
 reportHeapNow(false);
 */
     } while (0);
-    Serial.printf("sdCardDisplayImage returning %d\r\n", success);
+    if (debugPrint)
+        debugPrint->printf("sdCardDisplayImage returning %d\r\n", success);
     return success;
 }
 
@@ -809,7 +812,8 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
     if (csvData)
         free(csvData);
     csvFile.close();
-    Serial.printf("sdCardReadPicturesCsvFile returning %d\r\n", success);
+    if (debugPrint)
+        debugPrint->printf("sdCardReadPicturesCsvFile returning %d\r\n", success);
     return success;
 }
 
@@ -835,7 +839,8 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable,
 
     // Display the image
     success = sdCardDisplayFile(filePath);
-    Serial.printf("sdCardSelectFile returning %d\r\n", success);
+    if (debugPrint)
+        debugPrint->printf("sdCardSelectFile returning %d\r\n", success);
     return success;
 }
 
