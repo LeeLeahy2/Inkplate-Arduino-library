@@ -559,7 +559,7 @@ bool sdCardDisplayImage(Print * debugPrint)
             // Determine if the files should be updated
             bool csvExists = display.getSdFat().exists(CSV_FILE);
             if (((imageNumber % 12) == 0) || (csvExists == false))
-                NetworkCopyFilesToSdCard(NETWORK_TIMEOUT, &Serial);
+                NetworkCopyFilesToSdCard(NETWORK_TIMEOUT, DEBUG_SERIAL);
 
             // Determine if the .CSV file exists
             if (csvExists == false)
@@ -571,7 +571,7 @@ bool sdCardDisplayImage(Print * debugPrint)
             }
 
             // Read the Pictures.csv file
-            success = sdCardReadPicturesCsvFile(sdCardSelectFile, &Serial);
+            success = sdCardReadPicturesCsvFile(sdCardSelectFile, DEBUG_SERIAL);
         } while (0);
 
         // Done using SD card

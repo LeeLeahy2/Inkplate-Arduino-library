@@ -125,8 +125,8 @@ void setup()
     display.setTextColor(INKPLATE_BLACK);
 
     // Display an image from the SD card or the network
-    if (sdCardDisplayImage(&Serial) == false)
-        networkDisplayImage(NETWORK_TIMEOUT, &Serial);
+    if (sdCardDisplayImage(DEBUG_SERIAL) == false)
+        networkDisplayImage(NETWORK_TIMEOUT, DEBUG_SERIAL);
 
     // Set the next image number
     imageNumber += 1;
