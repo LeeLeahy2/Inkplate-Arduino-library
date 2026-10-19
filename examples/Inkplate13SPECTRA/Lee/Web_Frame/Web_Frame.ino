@@ -55,6 +55,8 @@
 // Constants
 //----------------------------------------
 
+#define HEADER_LINE_COUNT               3
+
 #define MICROSECONDS_IN_A_MILLISECOND   1000ull
 #define MILLISECONDS_IN_A_SECOND        1000ull
 #define SECONDS_IN_A_MINUTE             60ull
@@ -70,7 +72,10 @@
 //----------------------------------------
 
 Inkplate display;
-volatile RTC_DATA_ATTR uint32_t imageNumber;
+volatile RTC_DATA_ATTR uint32_t imageNumber;    // Image number to display
+volatile RTC_DATA_ATTR uint16_t displayMinutes; // Image display time in minutes
+volatile RTC_DATA_ATTR uint16_t imagesBeforeCsvUpdate;  // Time between CSV file updates
+                                                        // ~= displayMinutes * imagesBeforeCsvUpdate
 
 //----------------------------------------
 // Type declarations
@@ -120,6 +125,12 @@ void setup()
     // Display a sign-on message
     Serial.println("Web_Frame application");
 
+    // Set the default values of the parameters
+    if (displayMinutes == 0)
+        displayMinutes = 15;
+    if (imagesBeforeCsvUpdate == 0)
+        imagesBeforeCsvUpdate = 4;
+
     // Initialize the display
     display.begin();
     display.setTextColor(INKPLATE_BLACK);
@@ -128,6 +139,16 @@ void setup()
     if (sdCardDisplayImage(DEBUG_SERIAL) == false)
         networkDisplayImage(NETWORK_TIMEOUT, DEBUG_SERIAL);
 
+    // Display the parameters
+    Serial.printf("Image: %d\r\n");
+    Serial.printf("displayMinutes: %d\r\n", displayMinutes);
+    Serial.printf("imagesBeforeCsvUpdate: %d\r\n", imagesBeforeCsvUpdate);
+    uint32_t minutes = (uint32_t)displayMinutes
+                     * (uint32_t)(imagesBeforeCsvUpdate - (imageNumber % imagesBeforeCsvUpdate));
+    uint32_t hours = minutes / 60;
+    minutes -= hours * 60;
+    Serial.printf("Time before CVS update: %d:%02d\r\n", hours, minutes);
+
     // Set the next image number
     imageNumber += 1;
 
@@ -135,7 +156,7 @@ void setup()
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_18, 0);
 
     // Activate wakeup timer
-    esp_sleep_enable_timer_wakeup(15ll * 60 * 1000 * 1000);
+    esp_sleep_enable_timer_wakeup((uint64_t)displayMinutes * 60ull * 1000ull * 1000ull);
 
     // Start deep sleep (this function does not return). Program stops here.
     Serial.print("Going to sleep\r\n\n\n");

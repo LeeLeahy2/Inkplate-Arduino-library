@@ -79,12 +79,60 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
     }
 
     // Copy the files to the SD card
-    if (lineCount)
+    do
     {
+        int temp;
+
+        if (lineCount == 0)
+        {
+            break;
+        }
+
         Serial.println("Verifying files are on SD card");
+
+        //------------------------------------------------------
+        // The CSV file contains:
+        //
+        //      Display Minutes,Displayed Files Before CSV File Update
+        //      minutes,file count
+        //      SD_Card_File_Name,Network_Path
+        //      file_1,url_1
+        //      file_2,url_3
+        //         ***
+        //------------------------------------------------------
+
+        // Update the image display time
+        uint16_t u16;
+
+        entry = &csvTable[1];
+        if (debugPrint)
+            debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
+        if (sscanf(entry->_filePath, "%d", &temp) != 1)
+        {
+            Serial.println("ERROR: Failed to update displayMinutes");
+            break;
+        }
+        u16 = displayMinutes;
+        displayMinutes = (uint16_t)temp;
+        if (debugPrint)
+            debugPrint->printf("displayMinutes: %d --> %d\r\n", u16, displayMinutes);
+
+        // Update the CSV file polling interval
+        if (debugPrint)
+            debugPrint->printf("imagesBeforeCsvUpdate: %s\r\n", entry->_url);
+        if (sscanf(entry->_url, "%d", &temp) != 1)
+        {
+            Serial.println("ERROR: Failed to update imagesBeforeCsvUpdate");
+            break;
+        }
+        u16 = imagesBeforeCsvUpdate;
+        imagesBeforeCsvUpdate = (uint16_t)temp;
+        if (debugPrint)
+            debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
+
         // Walk the list of files
         fileNumber = 0;
-        lineNumber = 1;
+        lineNumber = HEADER_LINE_COUNT;
         entry = &csvTable[lineNumber];
         fileInfo = fileCount ? fileTable[fileNumber] : nullptr;
         while (entry)
@@ -101,6 +149,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
             // = File exists on the SD card, verify file size, re-copy if necessary
             diff = 1;
             if (fileInfo)
+                // Skip over the leading /
                 diff = STR_CMP(&fileInfo->_filePath[1], entry->_filePath);
             if (diff >= 0)
             {
@@ -241,20 +290,65 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
             }
             else
             {
+                ssize_t bytesWritten;
+
+                //------------------------------------------------------
+                // The CSV file contains:
+                //
+                //      Display Minutes,Displayed Files Before CSV File Update
+                //      minutes,file count
+                //      SD_Card_File_Name,Network_Path
+                //      file_1,url_1
+                //      file_2,url_3
+                //         ***
+                //------------------------------------------------------
+
+                // Add display minutes,files before update header
+                bytesWritten = file.printf("Display Minutes,Displayed Files Before CSV File Update\n");
+                if (bytesWritten < 0)
+                {
+                    Serial.println("ERROR: Failed to write to SD card!");
+                    success = false;
+                    break;
+                }
+
+                // Add the parameters
+                bytesWritten = file.printf("%d,%d\n",
+                                           displayMinutes,
+                                           imagesBeforeCsvUpdate);
+                if (bytesWritten < 0)
+                {
+                    Serial.println("ERROR: Failed to write to SD card!");
+                    success = false;
+                    break;
+                }
+
+                // Add the file,url header line
+                bytesWritten = file.printf("SD_Card_File_Name,Network_Path\n");
+                if (bytesWritten < 0)
+                {
+                    Serial.println("ERROR: Failed to write to SD card!");
+                    success = false;
+                    break;
+                }
+
+                //------------------------------------------------------
+                // Add the files
+                //------------------------------------------------------
+
                 // Add the CSV file to the SD card
-                lineNumber = 1;
+                lineNumber = HEADER_LINE_COUNT;
                 entry = &csvTable[lineNumber];
                 Serial.println("Found CSV file on SD card");
 
                 // Rebuild the contents of the .CSV file
                 while (entry)
                 {
-                    // Write the data to the SD card
-                    ssize_t bytesWritten = file.printf("%s,%s\n", entry->_filePath, entry->_url);
+                    // Write the file and URL to the SD card
+                    bytesWritten = file.printf("%s,%s\n", entry->_filePath, entry->_url);
                     if (bytesWritten < 0)
                     {
-                        if (debugPrint)
-                            debugPrint->println("ERROR: Failed to write to SD card!");
+                        Serial.println("ERROR: Failed to write to SD card!");
                         success = false;
                         break;
                     }
@@ -267,7 +361,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                 file.close();
             }
         }
-    }
+    } while (0);
     if (debugPrint)
         debugPrint->printf("sdCardCompareFiles returning %d\r\n", success);
     return success;
@@ -558,7 +652,7 @@ bool sdCardDisplayImage(Print * debugPrint)
 
             // Determine if the files should be updated
             bool csvExists = display.getSdFat().exists(CSV_FILE);
-            if (((imageNumber % 12) == 0) || (csvExists == false))
+            if (((imageNumber % imagesBeforeCsvUpdate) == 0) || (csvExists == false))
                 NetworkCopyFilesToSdCard(NETWORK_TIMEOUT, DEBUG_SERIAL);
 
             // Determine if the .CSV file exists
@@ -719,7 +813,7 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         }
 
         // Sort the entries
-        for (int i = 1; i < (lineCount - 1); i++)
+        for (int i = HEADER_LINE_COUNT; i < (lineCount - 1); i++)
             for (int j = i + 1; j < lineCount; j++)
             {
                 if (strcasecmp(csvTable[i]._filePath, csvTable[j]._filePath) > 0)
@@ -765,10 +859,10 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable,
     bool success;
 
     // Select a line in the file
-    lineNumber = imageNumber % (lineCount - 1);
+    lineNumber = imageNumber % (lineCount - HEADER_LINE_COUNT);
 
     // Skip the header line
-    lineNumber += 1;
+    lineNumber += HEADER_LINE_COUNT;
 
     // Locate the file path
     filePath = csvTable[lineNumber]._filePath;

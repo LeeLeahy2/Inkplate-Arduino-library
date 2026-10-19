@@ -246,7 +246,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         }
 
         // Sort the entries
-        for (int i = 1; i < (lineCount - 1); i++)
+        for (int i = HEADER_LINE_COUNT; i < (lineCount - 1); i++)
             for (int j = i + 1; j < lineCount; j++)
             {
                 if (strcasecmp(csvTable[i]._filePath, csvTable[j]._filePath) > 0)
@@ -397,14 +397,56 @@ bool networkSelectImage(const CSV_ENTRY * csvTable,
                         uint32_t lineCount,
                         Print * debugPrint)
 {
+    const CSV_ENTRY * entry;
     uint32_t lineNumber;
+    int temp;
     const char * url;
 
-    // Select a line in the file
-    lineNumber = imageNumber % (lineCount - 1);
+    //------------------------------------------------------
+    // The CSV file contains:
+    //
+    //      Display Minutes,Displayed Files Before CSV File Update
+    //      minutes,file count
+    //      SD_Card_File_Name,Network_Path
+    //      file_1,url_1
+    //      file_2,url_3
+    //         ***
+    //------------------------------------------------------
 
-    // Skip the header line
-    lineNumber += 1;
+    // Update the image display time
+    uint16_t u16;
+
+    entry = &csvTable[1];
+    if (debugPrint)
+        debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
+    if (sscanf(entry->_filePath, "%d", &temp) != 1)
+    {
+        Serial.println("ERROR: Failed to update displayMinutes");
+        return false;
+    }
+    u16 = displayMinutes;
+    displayMinutes = (uint16_t)temp;
+    if (debugPrint)
+        debugPrint->printf("displayMinutes: %d --> %d\r\n", u16, displayMinutes);
+
+    // Update the CSV file polling interval
+    if (debugPrint)
+        debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
+    if (sscanf(entry->_filePath, "%d", &temp) != 1)
+    {
+        Serial.println("ERROR: Failed to update imagesBeforeCsvUpdate");
+        return false;
+    }
+    u16 = imagesBeforeCsvUpdate;
+    imagesBeforeCsvUpdate = (uint16_t)temp;
+    if (debugPrint)
+        debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
+
+    // Select a line in the file
+    lineNumber = imageNumber % (lineCount - HEADER_LINE_COUNT);
+
+    // Skip the header lines
+    lineNumber += HEADER_LINE_COUNT;
 
     // Locate the URL
     url = csvTable[lineNumber]._url;
@@ -439,6 +481,7 @@ bool networkServerConnectUsingUrl(const char * url,
         String serverString = networkGetServerFromUrl(url);
         if (serverString.length() == 0)
         {
+            Serial.printf("URL: %s\r\n", url);
             Serial.println("ERROR: Failed to find server name in URL string");
             break;
         }
