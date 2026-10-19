@@ -34,11 +34,9 @@ bool networkDisplayImage(uint32_t timeout, Print * debugPrint)
     bool success;
 
     // Load, parse and sort the CSV file
-reportHeapNow(false);
     success = networkReadCsvFile(networkSelectImage,
                                  timeout,
                                  debugPrint);
-reportHeapNow(false);
     return success;
 }
 
