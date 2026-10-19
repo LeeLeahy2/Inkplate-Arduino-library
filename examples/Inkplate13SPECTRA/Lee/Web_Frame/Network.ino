@@ -126,8 +126,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         csvData = (char *)malloc(fileBytes + 1);
         if (csvData == nullptr)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Failed to allocate the csvStream");
+            Serial.println("ERROR: Failed to allocate the csvStream");
             break;
         }
 
@@ -147,8 +146,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
                 // Check for timeout
                 if ((millis() - timerStart) > timeout)
                 {
-                    if (debugPrint)
-                        debugPrint->println("ERROR: Timed out reading .CSV file");
+                    Serial.println("ERROR: Timed out reading .CSV file");
                     break;
                 }
                 delay(1);
@@ -159,8 +157,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
             ssize_t bytesRead = csvStream->read((uint8_t *)data, bytesToRead);
             if (bytesRead < 0)
             {
-                if (debugPrint)
-                    debugPrint->println("ERROR: Failed to read .CSV file!");
+                Serial.println("ERROR: Failed to read .CSV file!");
                 break;
             }
 
@@ -202,16 +199,14 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         // Check for an empty file
         if (lineCount == 0)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Empty .CSV found, no image to display!");
+            Serial.println("ERROR: Empty .CSV found, no image to display!");
             break;
         }
 
         // Check for a file with just a header
         if (lineCount == 1)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Header line found but no image to display!");
+            Serial.println("ERROR: Header line found but no image to display!");
             break;
         }
 
@@ -219,8 +214,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         csvTable = (CSV_ENTRY *)malloc(lineCount * sizeof(CSV_ENTRY));
         if (csvTable == nullptr)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Failed to allocate CSV table");
+            Serial.println("ERROR: Failed to allocate CSV table");
             break;
         }
 
@@ -445,8 +439,7 @@ bool networkServerConnectUsingUrl(const char * url,
         String serverString = networkGetServerFromUrl(url);
         if (serverString.length() == 0)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Failed to find server name in URL string");
+            Serial.println("ERROR: Failed to find server name in URL string");
             break;
         }
         const char * server = serverString.c_str();
@@ -455,8 +448,7 @@ bool networkServerConnectUsingUrl(const char * url,
         String ipAddressString = networkGetServerIpAddress(server, debugPrint);
         if (ipAddressString.length() == 0)
         {
-            if (debugPrint)
-                debugPrint->println("Failed to get the IP address for the server");
+            Serial.println("Failed to get the IP address for the server");
             break;
         }
         const char * ipAddress = ipAddressString.c_str();
@@ -471,8 +463,7 @@ bool networkServerConnectUsingUrl(const char * url,
             beginSuccess = https.begin(url);
             if (beginSuccess == false)
             {
-                if (debugPrint)
-                    debugPrint->println("ERROR: Failed to set the URL for the web server!\r\n");
+                Serial.println("ERROR: Failed to set the URL for the web server!\r\n");
                 break;
             }
 
@@ -485,10 +476,9 @@ bool networkServerConnectUsingUrl(const char * url,
                 break;
 
             // Display the error message
-            if (debugPrint)
-                debugPrint->printf("ERROR: HTTP GET failed, attempt %d of 3: %d (%s)\r\n",
-                                   attempt, httpResponseCode,
-                                   https.errorToString(httpResponseCode).c_str());
+            Serial.printf("ERROR: HTTP GET failed, attempt %d of 3: %d (%s)\r\n",
+                          attempt, httpResponseCode,
+                          https.errorToString(httpResponseCode).c_str());
 
             if (attempt < 3)
                 delay(500);
@@ -507,9 +497,8 @@ bool networkServerConnectUsingUrl(const char * url,
         // Handle the error from the web server
         if (httpResponseCode != expectedResponseCode)
         {
-            if (debugPrint)
-                debugPrint->printf("Web server response %d: %s\r\n", httpResponseCode,
-                                   https.errorToString(httpResponseCode).c_str());
+            Serial.printf("Web server response %d: %s\r\n", httpResponseCode,
+                          https.errorToString(httpResponseCode).c_str());
             if ((httpResponseCode == HTTP_CODE_OK) && debugPrint)
                 // A 200 here means the server ignored our Range request and is about to send
                 // the whole file from byte 0 - streaming that into this offset would corrupt
@@ -525,7 +514,7 @@ bool networkServerConnectUsingUrl(const char * url,
             debugPrint->printf("File size: %d (0x%08x) bytes\r\n", fileBytes, fileBytes);
         if ((ssize_t)fileBytes <= 0)
         {
-            debugPrint->println("ERROR: Web server did not report a file size.");
+            Serial.println("ERROR: Web server did not report a file size.");
             break;
         }
 

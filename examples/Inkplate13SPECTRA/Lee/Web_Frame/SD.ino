@@ -196,8 +196,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                                 // Check for timeout
                                 if ((millis() - timerStart) > DATA_TIMEOUT)
                                 {
-                                    if (debugPrint)
-                                        debugPrint->printf("ERROR: Timed out reading .CSV file\r\n", entry->_filePath);
+                                    Serial.printf("ERROR: Timed out reading .CSV file\r\n", entry->_filePath);
                                     success = false;
                                     break;
                                 }
@@ -210,8 +209,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                             ssize_t bytesRead = dataStream->read((uint8_t *)buffer, bytesToRead);
                             if (bytesRead < 0)
                             {
-                                if (debugPrint)
-                                    debugPrint->printf("ERROR: Failed to read %s\r\n", entry->_filePath);
+                                Serial.printf("ERROR: Failed to read %s\r\n", entry->_filePath);
                                 success = false;
                                 break;
                             }
@@ -220,8 +218,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                             ssize_t bytesWritten = file.write((uint8_t *)buffer, bytesRead);
                             if (bytesWritten < 0)
                             {
-                                if (debugPrint)
-                                    debugPrint->println("ERROR: Failed to write to SD card!");
+                                Serial.println("ERROR: Failed to write to SD card!");
                                 break;
                             }
 
@@ -559,8 +556,7 @@ bool sdCardDisplayImage(Print * debugPrint)
         // Init SD card. Display if SD card is init propery or not.
         if (display.sdCardInit() == false)
         {
-            if (debugPrint)
-                debugPrint->println("Warning: Failed to initialize the SD card");
+            Serial.println("Warning: Failed to initialize the SD card");
             success = false;
             break;
         }
@@ -678,8 +674,7 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         csvData = (char *)malloc(fileBytes + 1);
         if (csvData == nullptr)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Failed to allocate the csvStream");
+            Serial.println("ERROR: Failed to allocate the csvStream");
             break;
         }
 
@@ -695,8 +690,7 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         ssize_t bytesRead = csvFile.read((uint8_t *)data, fileBytes);
         if (bytesRead < 0)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Failed to read .CSV file!");
+            Serial.println("ERROR: Failed to read .CSV file!");
             break;
         }
 
@@ -732,16 +726,14 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         // Check for an empty file
         if (lineCount == 0)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Empty .CSV found, no image to display!");
+            Serial.println("ERROR: Empty .CSV found, no image to display!");
             break;
         }
 
         // Check for a file with just a header
         if (lineCount == 1)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Header line found but no image to display!");
+            Serial.println("ERROR: Header line found but no image to display!");
             break;
         }
 
@@ -749,8 +741,7 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         csvTable = (CSV_ENTRY *)malloc(lineCount * sizeof(CSV_ENTRY));
         if (csvTable == nullptr)
         {
-            if (debugPrint)
-                debugPrint->println("ERROR: Failed to allocate CSV table");
+            Serial.println("ERROR: Failed to allocate CSV table");
             break;
         }
 
@@ -889,7 +880,7 @@ bool sdCardDisplayFile(const char * filePath, Print * debugPrint)
         if (success)
             display.display();
         else
-            Serial.println("Failed to load the image");
+            Serial.println("ERROR: Failed to load the image");
 
         // Done with the file
         file.close();
