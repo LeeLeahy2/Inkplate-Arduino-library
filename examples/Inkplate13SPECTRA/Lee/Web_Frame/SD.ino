@@ -88,28 +88,31 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
     csvTable = csvContext->_csvTable;
     lineCount = csvContext->_lineCount;
 
-    // List the files in the CSV file
-    Serial.println("----------------------------------------");
-    Serial.println("CSV Data");
-    Serial.println("----------------------------------------");
-    Serial.printf("lineCount: %d\r\n", lineCount);
-    for (int i = 1; i < lineCount; i++)
+    if (debugPrint)
     {
-        entry = &csvTable[i];
-        Serial.printf("%s,   %s\r\n", entry->_filePath, entry->_url);
-    }
+        // List the files in the CSV file
+        debugPrint->println("----------------------------------------");
+        debugPrint->println("CSV Data");
+        debugPrint->println("----------------------------------------");
+        debugPrint->printf("lineCount: %d\r\n", lineCount);
+        for (int i = 1; i < lineCount; i++)
+        {
+            entry = &csvTable[i];
+            debugPrint->printf("%s,   %s\r\n", entry->_filePath, entry->_url);
+        }
 
-    Serial.println("----------------------------------------");
-    Serial.println("SD Card Files");
-    Serial.println("----------------------------------------");
-    Serial.printf("fileCount: %d\r\n", fileCount);
-    for (int i = 0; i < fileCount; i++)
-    {
-        fileInfo = fileTable[i];
-        Serial.printf("%s%s   %d bytes\r\n",
-                      fileInfo->_filePath,
-                      fileInfo->_isDirectory ? " (Dir)" : "",
-                      fileInfo->_fileBytes);
+        debugPrint->println("----------------------------------------");
+        debugPrint->println("SD Card Files");
+        debugPrint->println("----------------------------------------");
+        debugPrint->printf("fileCount: %d\r\n", fileCount);
+        for (int i = 0; i < fileCount; i++)
+        {
+            fileInfo = fileTable[i];
+            debugPrint->printf("%s%s   %d bytes\r\n",
+                               fileInfo->_filePath,
+                               fileInfo->_isDirectory ? " (Dir)" : "",
+                               fileInfo->_fileBytes);
+        }
     }
 
     // Copy the files to the SD card
