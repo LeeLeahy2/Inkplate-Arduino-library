@@ -55,7 +55,7 @@
 // Constants
 //----------------------------------------
 
-#define CHARGE_VOLTAGE                  3.9
+#define CHARGE_VOLTAGE                  3.6
 
 #define HEADER_LINE_COUNT               5
 
@@ -86,6 +86,7 @@ volatile RTC_DATA_ATTR uint16_t imagesBeforeCsvUpdate;  // Time between CSV file
                                                         // ~= displayMinutes * imagesBeforeCsvUpdate
 volatile RTC_DATA_ATTR bool debuggingEnabled;   // Enable or disable debugging output
 volatile RTC_DATA_ATTR bool displayFiles;       // Display files when true
+RTC_DATA_ATTR float batteryVoltage;             // Battery voltage
 
 //----------------------------------------
 // Type declarations
@@ -275,14 +276,17 @@ void drawCenteredText(int16_t x, int16_t y, const char * text)
 //----------------------------------------
 void displayBatteryVoltage()
 {
-    float batteryVoltage;
     uint16_t h;
     const int loopCount = 8;
+    float previousBatteryVoltage;
     uint16_t w;
     int16_t x;
     int16_t x1;
     int16_t y;
     int16_t y1;
+
+    // Get previous battery voltage
+    previousBatteryVoltage = batteryVoltage;
 
     // Compute the voltage
     batteryVoltage = 0;
@@ -291,9 +295,10 @@ void displayBatteryVoltage()
     batteryVoltage = batteryVoltage / loopCount;
 
     // Determine if it is time to charge the battery
+    // Below critical voltage and not charging
     Serial.printf("Battery Voltage: %4.2fV\r\n", batteryVoltage);
     sprintf(batteryVoltageString, "Battery: %4.2fV", batteryVoltage);
-    if (batteryVoltage < CHARGE_VOLTAGE)
+    if ((batteryVoltage < CHARGE_VOLTAGE) && (previousBatteryVoltage >= batteryVoltage))
     {
         x = 25;
         y = 0;
