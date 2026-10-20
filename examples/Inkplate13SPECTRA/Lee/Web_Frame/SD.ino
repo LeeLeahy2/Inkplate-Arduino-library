@@ -971,12 +971,6 @@ bool sdCardDisplayFile(const char * filePath)
             success = display.image.drawPngFromSd(&file, 0, 0, false, false);
         }
 
-        // Display the image
-        if (success)
-            display.display();
-        else
-            Serial.println("ERROR: Failed to load the image");
-
         // Done with the file
         file.close();
     }

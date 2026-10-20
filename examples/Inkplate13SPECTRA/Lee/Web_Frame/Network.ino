@@ -71,9 +71,6 @@ bool networkDisplayUrl(const char * url)
         success = display.image.drawPngFromWeb(url, 0, 0, true, false);
     }
 
-    // Display the image
-    if (success)
-        display.display();
     if (debugPrint)
         debugPrint->printf("networkDisplayUrl returning %d\r\n", success);
     return success;

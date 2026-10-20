@@ -76,6 +76,7 @@
 // Globals
 //----------------------------------------
 
+char batteryVoltageString[64];
 Print * debugPrint;
 Inkplate display;
 
@@ -127,6 +128,8 @@ typedef bool (* SD_CARD_PROCESS_FILES)(const FILE_INFO ** fileTable,
 //----------------------------------------
 void setup()
 {
+    bool success;
+
     Serial.begin(115200);
 
     // Display a sign-on message
@@ -143,14 +146,29 @@ void setup()
 
     // Initialize the display
     display.begin();
+    display.clearDisplay();
     display.setTextColor(INKPLATE_BLACK);
 
     // Display the battery voltage
     displayBatteryVoltage();
 
     // Display an image from the SD card or the network
-    if (sdCardDisplayImage() == false)
-        networkDisplayImage(NETWORK_TIMEOUT);
+    success = sdCardDisplayImage();
+    if (success == false)
+        success = networkDisplayImage(NETWORK_TIMEOUT);
+
+    // Display the image
+    if (success == false)
+    {
+        Serial.println("ERROR: Failed to load the image");
+        display.clearDisplay();
+    }
+
+    // Display the battery voltage at the bottom of the screen
+    displayBatteryVoltageOverlay();
+
+    // Display the image
+    display.display();
 
     // Display the parameters
     Serial.printf("imageNumber: %d\r\n", imageNumber);
@@ -173,6 +191,42 @@ void setup()
 
     // Enter deep sleep
     deepSleep();
+}
+
+//----------------------------------------
+// Display the battery voltage at the bottom of the screen
+//----------------------------------------
+void displayBatteryVoltageOverlay()
+{
+    uint16_t h;
+    int16_t hRect;
+    size_t length;
+    uint16_t w;
+    int16_t wRect;
+    int16_t x;
+    int16_t x1;
+    int16_t y;
+    int16_t y1;
+
+    // Determine the text size
+    display.setTextSize(2);
+    display.getTextBounds(batteryVoltageString, 0, 0, &x1, &y1, &w, &h);
+
+    // Add the white background for the text
+    length = strlen(batteryVoltageString);
+    hRect = (6 * h) / 4;
+    wRect = ((length + 1) * w) / length;
+    x = (DISPLAY_WIDTH - wRect) / 2;
+    y = DISPLAY_HEIGHT - hRect;
+    display.setCursor(x, y);
+    display.fillRect(x, y, wRect, hRect, INKPLATE_WHITE);
+
+    // Add the battery voltage text
+    x = (DISPLAY_WIDTH - w) / 2;
+    y = DISPLAY_HEIGHT - ((5 * h) / 4);
+    display.setCursor(x, y);
+    display.setTextColor(INKPLATE_BLACK);
+    display.print(batteryVoltageString);
 }
 
 //----------------------------------------
@@ -202,10 +256,10 @@ void loop()
 //----------------------------------------
 void drawCenteredText(int16_t x, int16_t y, const char * text)
 {
+    uint16_t h;
+    uint16_t w;
     int16_t x1;
     int16_t y1;
-    uint16_t w;
-    uint16_t h;
 
     // Calculate bounds starting at dummy coordinate (0, 0)
     display.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
@@ -222,8 +276,13 @@ void drawCenteredText(int16_t x, int16_t y, const char * text)
 void displayBatteryVoltage()
 {
     float batteryVoltage;
-    char line[64];
+    uint16_t h;
     const int loopCount = 8;
+    uint16_t w;
+    int16_t x;
+    int16_t x1;
+    int16_t y;
+    int16_t y1;
 
     // Compute the voltage
     batteryVoltage = 0;
@@ -233,10 +292,11 @@ void displayBatteryVoltage()
 
     // Determine if it is time to charge the battery
     Serial.printf("Battery Voltage: %4.2fV\r\n", batteryVoltage);
+    sprintf(batteryVoltageString, "Battery: %4.2fV", batteryVoltage);
     if (batteryVoltage < CHARGE_VOLTAGE)
     {
-        int16_t x = 25;
-        int16_t y = 0;
+        x = 25;
+        y = 0;
         int16_t vSpacing = 200;
 
         // Request USB cable
@@ -252,8 +312,7 @@ void displayBatteryVoltage()
         y += vSpacing;
         y += vSpacing;
         display.setTextSize(18);    // Set text size (uint8_t, default is 1)
-        sprintf(line, "Battery: %4.2fV", batteryVoltage);
-        drawCenteredText(x, y, line);
+        drawCenteredText(x, y, batteryVoltageString);
 
         // Refresh the e-paper display to show changes
         display.display();
