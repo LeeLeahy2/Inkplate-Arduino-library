@@ -55,6 +55,8 @@
 // Constants
 //----------------------------------------
 
+#define CHARGE_VOLTAGE                  3.9
+
 #define HEADER_LINE_COUNT               5
 
 #define MICROSECONDS_IN_A_MILLISECOND   1000ull
@@ -66,6 +68,9 @@
 
 #define NETWORK_TIMEOUT             ((uint32_t)(15 * MICROSECONDS_IN_A_MINUTE))
 #define DATA_TIMEOUT                (15 * MILLISECONDS_IN_A_SECOND)
+
+#define DISPLAY_WIDTH       1600
+#define DISPLAY_HEIGHT      1200
 
 //----------------------------------------
 // Globals
@@ -140,6 +145,9 @@ void setup()
     display.begin();
     display.setTextColor(INKPLATE_BLACK);
 
+    // Display the battery voltage
+    displayBatteryVoltage();
+
     // Display an image from the SD card or the network
     if (sdCardDisplayImage() == false)
         networkDisplayImage(NETWORK_TIMEOUT);
@@ -160,11 +168,20 @@ void setup()
     // Set the next image number
     imageNumber += 1;
 
-    // Enable push button wakup from deep sleep on gpio 18
-    esp_sleep_enable_ext0_wakeup(GPIO_NUM_18, 0);
-
     // Activate wakeup timer
     esp_sleep_enable_timer_wakeup((uint64_t)displayMinutes * 60ull * 1000ull * 1000ull);
+
+    // Enter deep sleep
+    deepSleep();
+}
+
+//----------------------------------------
+// Enter deep sleep
+//----------------------------------------
+void deepSleep()
+{
+    // Enable push button wakup from deep sleep on gpio 18
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_18, 0);
 
     // Start deep sleep (this function does not return). Program stops here.
     Serial.print("Going to sleep\r\n\n\n");
@@ -178,6 +195,72 @@ void loop()
 {
     // Never here! If you are using deep sleep, the whole program should be in setup() because the board restarts each
     // time. loop() must be empty!
+}
+
+//----------------------------------------
+// Draw text centered on the line
+//----------------------------------------
+void drawCenteredText(int16_t x, int16_t y, const char * text)
+{
+    int16_t x1;
+    int16_t y1;
+    uint16_t w;
+    uint16_t h;
+
+    // Calculate bounds starting at dummy coordinate (0, 0)
+    display.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+
+    // Center the text horizontally
+    x = (DISPLAY_WIDTH - w) / 2;
+    display.setCursor(x, y);
+    display.print(text);
+}
+
+//----------------------------------------
+// Display the battery voltage
+//----------------------------------------
+void displayBatteryVoltage()
+{
+    float batteryVoltage;
+    char line[64];
+    const int loopCount = 8;
+
+    // Compute the voltage
+    batteryVoltage = 0;
+    for (int i = 0; i < loopCount; i++)
+        batteryVoltage += display.readBattery(); // Read battery voltage
+    batteryVoltage = batteryVoltage / loopCount;
+
+    // Determine if it is time to charge the battery
+    Serial.printf("Battery Voltage: %4.2fV\r\n", batteryVoltage);
+    if (batteryVoltage < CHARGE_VOLTAGE)
+    {
+        int16_t x = 25;
+        int16_t y = 0;
+        int16_t vSpacing = 200;
+
+        // Request USB cable
+        y += vSpacing;
+        display.clearDisplay();     // Clear the frame buffer (does NOT clear the physical screen)
+        display.setTextSize(20);    // Set text size (uint8_t, default is 1)
+        drawCenteredText(x, y, "Plug In");
+
+        y += vSpacing;
+        drawCenteredText(x, y, "USB Cable");
+
+        // Display the voltage
+        y += vSpacing;
+        y += vSpacing;
+        display.setTextSize(18);    // Set text size (uint8_t, default is 1)
+        sprintf(line, "Battery: %4.2fV", batteryVoltage);
+        drawCenteredText(x, y, line);
+
+        // Refresh the e-paper display to show changes
+        display.display();
+
+        // Enter sleep mode
+        deepSleep();
+    }
 }
 
 //----------------------------------------
