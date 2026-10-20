@@ -79,6 +79,7 @@ volatile RTC_DATA_ATTR uint16_t displayMinutes; // Image display time in minutes
 volatile RTC_DATA_ATTR uint16_t imagesBeforeCsvUpdate;  // Time between CSV file updates
                                                         // ~= displayMinutes * imagesBeforeCsvUpdate
 volatile RTC_DATA_ATTR bool debuggingEnabled;   // Enable or disable debugging output
+volatile RTC_DATA_ATTR bool displayFiles;       // Display files when true
 
 //----------------------------------------
 // Type declarations
@@ -144,9 +145,10 @@ void setup()
         networkDisplayImage(NETWORK_TIMEOUT);
 
     // Display the parameters
-    Serial.printf("Image: %d\r\n");
+    Serial.printf("imageNumber: %d\r\n", imageNumber);
     Serial.printf("displayMinutes: %d\r\n", displayMinutes);
     Serial.printf("imagesBeforeCsvUpdate: %d\r\n", imagesBeforeCsvUpdate);
+    Serial.printf("displayFiles: %d\r\n", displayFiles);
 
     // Display the time to next CSV update
     uint32_t minutes = (uint32_t)displayMinutes
