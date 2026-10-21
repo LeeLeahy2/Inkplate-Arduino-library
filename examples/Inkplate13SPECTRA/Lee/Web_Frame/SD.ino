@@ -87,84 +87,16 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
             break;
         }
 
-        Serial.println("Verifying files are on SD card");
-
-        //------------------------------------------------------
-        // The CSV file contains:
-        //
-        //  Line    Description
-        //    0     Display Minutes,Displayed Files Before CSV File Update
-        //    1     minutes,file count
-        //    2     Debug enable=1 disable=0,Not Used
-        //    3     debuggingEnabled,reserved
-        //    4     SD_Card_File_Name,Network_Path
-        //    5     file_1,url_1
-        //    6     file_2,url_3
-        //    n     ***
-        //------------------------------------------------------
-
-        // Update the image display time
-        uint16_t u16;
-
-        entry = &csvTable[1];
-        if (debugPrint)
-            debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
-        if (sscanf(entry->_filePath, "%d", &temp) != 1)
-        {
-            Serial.println("ERROR: Failed to update displayMinutes");
+        // Get the parameters
+        if (networkParseCsvFileParameters(csvTable, lineCount) == false)
             break;
-        }
-        u16 = displayMinutes;
-        displayMinutes = (uint16_t)temp;
-        if (debugPrint)
-            debugPrint->printf("displayMinutes: %d --> %d\r\n", u16, displayMinutes);
-
-        // Update the CSV file polling interval
-        if (debugPrint)
-            debugPrint->printf("imagesBeforeCsvUpdate: %s\r\n", entry->_url);
-        if (sscanf(entry->_url, "%d", &temp) != 1)
-        {
-            Serial.println("ERROR: Failed to update imagesBeforeCsvUpdate");
-            break;
-        }
-        u16 = imagesBeforeCsvUpdate;
-        imagesBeforeCsvUpdate = (uint16_t)temp;
-        if (debugPrint)
-            debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
-
-        // Update debuggingEnabled
-        entry = &csvTable[3];
-        if (debugPrint)
-            debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
-        if (sscanf(entry->_filePath, "%d", &temp) != 1)
-        {
-            Serial.println("ERROR: Failed to update debuggingEnabled");
-            return false;
-        }
-        u16 = debuggingEnabled;
-        debuggingEnabled = (bool)temp;
-        debugPrint = debuggingEnabled ? &Serial : nullptr;
-        if (debuggingEnabled != u16)
-            Serial.printf("debuggingEnabled: %d --> %d\r\n", u16, debuggingEnabled);
-
-        // Update displayFiles
-        if (debugPrint)
-            debugPrint->printf("entry->_url: %s\r\n", entry->_url);
-        if (sscanf(entry->_url, "%d", &temp) != 1)
-        {
-            Serial.println("ERROR: Failed to update displayFiles");
-            return false;
-        }
-        u16 = displayFiles;
-        displayFiles = (bool)temp;
-        if (displayFiles != u16)
-            Serial.printf("displayFiles: %d --> %d\r\n", u16, displayFiles);
 
         // Walk the list of files
         fileNumber = 0;
         lineNumber = HEADER_LINE_COUNT;
         entry = &csvTable[lineNumber];
         fileInfo = fileCount ? fileTable[fileNumber] : nullptr;
+        Serial.println("Verifying files are on SD card");
         while (entry)
         {
             int diff;

@@ -189,6 +189,86 @@ String networkGetServerIpAddress(const char * server)
 }
 
 //----------------------------------------
+// Get the parameters from the CSV file
+//----------------------------------------
+bool networkParseCsvFileParameters(const CSV_ENTRY * csvTable, uint32_t lineCount)
+{
+    const CSV_ENTRY * entry;
+    int temp;
+    uint16_t u16;
+
+    //------------------------------------------------------
+    // The CSV file contains:
+    //
+    //  Line    Description
+    //    0     Display Minutes,Displayed Files Before CSV File Update
+    //    1     minutes,file count
+    //    2     SD_Card_File_Name,Network_Path
+    //    3     Debug enable=1 disable=0,Not Used
+    //    4     debuggingEnabled,reserved
+    //    5     file_1,url_1
+    //    6     file_2,url_3
+    //    n     ***
+    //------------------------------------------------------
+
+    // Update the image display time
+    entry = &csvTable[1];
+    if (debugPrint)
+        debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
+    if (sscanf(entry->_filePath, "%d", &temp) != 1)
+    {
+        Serial.println("ERROR: Failed to update displayMinutes");
+        return false;
+    }
+    u16 = displayMinutes;
+    displayMinutes = (uint16_t)temp;
+    if (debugPrint)
+        debugPrint->printf("displayMinutes: %d --> %d\r\n", u16, displayMinutes);
+
+    // Update the CSV file polling interval
+    if (debugPrint)
+        debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
+    if (sscanf(entry->_url, "%d", &temp) != 1)
+    {
+        Serial.println("ERROR: Failed to update imagesBeforeCsvUpdate");
+        return false;
+    }
+    u16 = imagesBeforeCsvUpdate;
+    imagesBeforeCsvUpdate = (uint16_t)temp;
+    if (debugPrint)
+        debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
+
+    // Update debuggingEnabled
+    entry = &csvTable[3];
+    if (debugPrint)
+        debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
+    if (sscanf(entry->_filePath, "%d", &temp) != 1)
+    {
+        Serial.println("ERROR: Failed to update debuggingEnabled");
+        return false;
+    }
+    u16 = debuggingEnabled;
+    debuggingEnabled = (bool)temp;
+    debugPrint = debuggingEnabled ? &Serial : nullptr;
+    if (debuggingEnabled != u16)
+        Serial.printf("debuggingEnabled: %d --> %d\r\n", u16, debuggingEnabled);
+
+    // Update displayFiles
+    if (debugPrint)
+        debugPrint->printf("entry->_url: %s\r\n", entry->_url);
+    if (sscanf(entry->_url, "%d", &temp) != 1)
+    {
+        Serial.println("ERROR: Failed to update displayFiles");
+        return false;
+    }
+    u16 = displayFiles;
+    displayFiles = (bool)temp;
+    if (displayFiles != u16)
+        Serial.printf("displayFiles: %d --> %d\r\n", u16, displayFiles);
+    return true;
+}
+
+//----------------------------------------
 // Read the CSV file from the network
 //----------------------------------------
 bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout)
@@ -387,106 +467,47 @@ bool networkSelectImage(const CSV_ENTRY * csvTable, uint32_t lineCount)
 {
     const CSV_ENTRY * entry;
     uint32_t lineNumber;
+    bool success;
     int temp;
     const char * url;
 
-    if (displayFiles)
+    do      // Common exit
     {
-        // List the files in the CSV file
-        Serial.println("----------------------------------------");
-        Serial.println("CSV Data");
-        Serial.println("----------------------------------------");
-        Serial.printf("lineCount: %d\r\n", lineCount);
-        for (int i = 0; i < lineCount; i++)
+        success = false;
+
+        if (displayFiles)
         {
-            entry = &csvTable[i];
-            Serial.printf("%s,   %s\r\n", entry->_filePath, entry->_url);
+            // List the files in the CSV file
+            Serial.println("----------------------------------------");
+            Serial.println("CSV Data");
+            Serial.println("----------------------------------------");
+            Serial.printf("lineCount: %d\r\n", lineCount);
+            for (int i = 0; i < lineCount; i++)
+            {
+                entry = &csvTable[i];
+                Serial.printf("%s,   %s\r\n", entry->_filePath, entry->_url);
+            }
         }
-    }
 
-    //------------------------------------------------------
-    // The CSV file contains:
-    //
-    //  Line    Description
-    //    0     Display Minutes,Displayed Files Before CSV File Update
-    //    1     minutes,file count
-    //    2     SD_Card_File_Name,Network_Path
-    //    3     Debug enable=1 disable=0,Not Used
-    //    4     debuggingEnabled,reserved
-    //    5     file_1,url_1
-    //    6     file_2,url_3
-    //    n     ***
-    //------------------------------------------------------
+        // Get the parameters from the CSV file
+        success = networkParseCsvFileParameters(csvTable, lineCount);
+        if (success == false)
+            break;
 
-    // Update the image display time
-    uint16_t u16;
+        // Select a line in the file
+        lineNumber = imageNumber % (lineCount - HEADER_LINE_COUNT);
 
-    entry = &csvTable[1];
-    if (debugPrint)
-        debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
-    if (sscanf(entry->_filePath, "%d", &temp) != 1)
-    {
-        Serial.println("ERROR: Failed to update displayMinutes");
-        return false;
-    }
-    u16 = displayMinutes;
-    displayMinutes = (uint16_t)temp;
-    if (debugPrint)
-        debugPrint->printf("displayMinutes: %d --> %d\r\n", u16, displayMinutes);
+        // Skip the header lines
+        lineNumber += HEADER_LINE_COUNT;
 
-    // Update the CSV file polling interval
-    if (debugPrint)
-        debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
-    if (sscanf(entry->_filePath, "%d", &temp) != 1)
-    {
-        Serial.println("ERROR: Failed to update imagesBeforeCsvUpdate");
-        return false;
-    }
-    u16 = imagesBeforeCsvUpdate;
-    imagesBeforeCsvUpdate = (uint16_t)temp;
-    if (debugPrint)
-        debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
+        // Locate the URL
+        url = csvTable[lineNumber]._url;
 
-    // Update debuggingEnabled
-    entry = &csvTable[3];
-    if (debugPrint)
-        debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
-    if (sscanf(entry->_filePath, "%d", &temp) != 1)
-    {
-        Serial.println("ERROR: Failed to update debuggingEnabled");
-        return false;
-    }
-    u16 = debuggingEnabled;
-    debuggingEnabled = (bool)temp;
-    debugPrint = debuggingEnabled ? &Serial : nullptr;
-    if (debuggingEnabled != u16)
-        Serial.printf("debuggingEnabled: %d --> %d\r\n", u16, debuggingEnabled);
-
-    // Update displayFiles
-    if (debugPrint)
-        debugPrint->printf("entry->_url: %s\r\n", entry->_url);
-    if (sscanf(entry->_url, "%d", &temp) != 1)
-    {
-        Serial.println("ERROR: Failed to update displayFiles");
-        return false;
-    }
-    u16 = displayFiles;
-    displayFiles = (bool)temp;
-    if (displayFiles != u16)
-        Serial.printf("displayFiles: %d --> %d\r\n", u16, displayFiles);
-
-    // Select a line in the file
-    lineNumber = imageNumber % (lineCount - HEADER_LINE_COUNT);
-
-    // Skip the header lines
-    lineNumber += HEADER_LINE_COUNT;
-
-    // Locate the URL
-    url = csvTable[lineNumber]._url;
-
-    // Display the image
-    Serial.printf("Selected URL: %s\r\n", url);
-    return networkDisplayUrl(url);
+        // Display the image
+        Serial.printf("Selected URL: %s\r\n", url);
+        success = networkDisplayUrl(url);
+    } while (0);
+    return success;
 }
 
 //----------------------------------------
