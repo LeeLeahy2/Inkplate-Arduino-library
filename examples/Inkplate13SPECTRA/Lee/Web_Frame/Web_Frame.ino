@@ -377,7 +377,28 @@ void getBatteryVoltage()
 }
 
 //----------------------------------------
-// If debug option is on, print available heap
+// Display the fatal error
+//----------------------------------------
+void reportFatalError(const char * errorMessage)
+{
+    // Display the error
+    Serial.printf("%s\r\n", errorMessage);
+
+    // Create the message in the frame buffer
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(INKPLATE_BLACK);
+    drawCenteredText(200, errorMessage);
+
+    // Display the error message on the e-paper display
+    display.display();
+
+    // Sleep
+    deepSleep();
+}
+
+//----------------------------------------
+// Print available heap
 //----------------------------------------
 void reportHeapNow(bool includePsram)
 {
