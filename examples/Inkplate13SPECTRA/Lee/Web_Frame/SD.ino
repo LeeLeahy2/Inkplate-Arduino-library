@@ -14,8 +14,6 @@
 // Constants
 //----------------------------------------
 
-#define CSV_FILE        "Pictures.csv"
-
 #define STR_CMP         strcasecmp
 
 //----------------------------------------
@@ -149,7 +147,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
                     Serial.printf("Copy %s -> %s\r\n", entry->_url, entry->_filePath);
 
                     // Open the file on the SD card
-                    if (!file.open(entry->_filePath, O_RDWR | O_CREAT | O_TRUNC))
+                    if (!file.open(entry->_filePath, O_WRONLY | O_CREAT | O_TRUNC))
                     {
                         Serial.printf("Error opening %s\r\n", entry->_filePath);
                         success = false;
@@ -242,107 +240,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
 
         // Open the file on the SD card
         if (success)
-        {
-            FsFile file;
-            if (!file.open(CSV_FILE, O_RDWR | O_CREAT | O_TRUNC))
-            {
-                Serial.printf("Error opening %s\r\n", entry->_filePath);
-                success = false;
-            }
-            else
-            {
-                ssize_t bytesWritten;
-
-                //------------------------------------------------------
-                // The CSV file contains:
-                //
-                //  Line    Description
-                //    0     Display Minutes,Displayed Files Before CSV File Update
-                //    1     minutes,file count
-                //    2     Debug enable=1 disable=0,Not Used
-                //    3     debuggingEnabled,reserved
-                //    4     SD_Card_File_Name,Network_Path
-                //    5     file_1,url_1
-                //    6     file_2,url_3
-                //    n     ***
-                //------------------------------------------------------
-
-                // Line 0) Add display minutes,files before update header
-                bytesWritten = file.printf("Display Minutes,Displayed Files Before CSV File Update\n");
-                if (bytesWritten < 0)
-                {
-                    Serial.println("ERROR: Failed to write to SD card!");
-                    success = false;
-                    break;
-                }
-
-                // Line 1) Add the parameters
-                bytesWritten = file.printf("%d,%d\n",
-                                           displayMinutes,
-                                           imagesBeforeCsvUpdate);
-                if (bytesWritten < 0)
-                {
-                    Serial.println("ERROR: Failed to write to SD card!");
-                    success = false;
-                    break;
-                }
-
-                // Line 2) Add the debugging header line
-                bytesWritten = file.printf("Debug enable=1 disable=0,Display CSV and SD Card Files\n");
-                if (bytesWritten < 0)
-                {
-                    Serial.println("ERROR: Failed to write to SD card!");
-                    success = false;
-                    break;
-                }
-
-                // Line 3) Add the debuggingEnabled line
-                bytesWritten = file.printf("%d,%d\n", debuggingEnabled, displayFiles);
-                if (bytesWritten < 0)
-                {
-                    Serial.println("ERROR: Failed to write to SD card!");
-                    success = false;
-                    break;
-                }
-
-                // Line 4) Add the file,url header line
-                bytesWritten = file.printf("SD_Card_File_Name,Network_Path\n");
-                if (bytesWritten < 0)
-                {
-                    Serial.println("ERROR: Failed to write to SD card!");
-                    success = false;
-                    break;
-                }
-
-                //------------------------------------------------------
-                // Add the files
-                //------------------------------------------------------
-
-                // Add the CSV file to the SD card
-                lineNumber = HEADER_LINE_COUNT;
-                entry = &csvTable[lineNumber];
-                Serial.println("Found CSV file on SD card");
-
-                // Rebuild the contents of the .CSV file
-                while (entry)
-                {
-                    // Write the file and URL to the SD card
-                    bytesWritten = file.printf("%s,%s\n", entry->_filePath, entry->_url);
-                    if (bytesWritten < 0)
-                    {
-                        Serial.println("ERROR: Failed to write to SD card!");
-                        success = false;
-                        break;
-                    }
-
-                    // Get the next CSV file entry
-                    entry = (++lineNumber < lineCount) ? entry + 1 : nullptr;
-                }
-
-                // Close the .CSV file
-                file.close();
-            }
-        }
+            success = sdCardWriteCsvFile(csvTable, lineCount);
     } while (0);
     if (debugPrint)
         debugPrint->printf("sdCardCompareFiles returning %d\r\n", success);
@@ -558,7 +456,6 @@ void sdCardDisplayFileInfoTableHeader(uint32_t fileCount)
     }
 }
 
-
 //----------------------------------------
 // Display an image from the SD card
 //----------------------------------------
@@ -724,9 +621,9 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines)
         csvTable = nullptr;
 
         // Attempt to open the .CSV file
-        if (!csvFile.open(filePath, O_RDONLY))
+        if (!csvFile.open(CSV_FILE, O_RDONLY))
         {
-            Serial.printf("Error opening %s\r\n", filePath);
+            Serial.printf("Error opening %s\r\n", CSV_FILE);
             success = false;
             break;
         }
@@ -794,7 +691,7 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines)
         }
 
         // Check for a file with just a header
-        if (lineCount == 1)
+        if (lineCount <= HEADER_LINE_COUNT)
         {
             Serial.println("ERROR: Header line found but no image to display!");
             break;
@@ -1086,5 +983,120 @@ bool sdCardWalkDirectoryTree(const char * path,
         // Close the directory
         sdRootDir.close();
     }
+    return success;
+}
+
+//----------------------------------------
+// Write the CSV data to a file
+//----------------------------------------
+bool sdCardWriteCsvFile(const CSV_ENTRY * csvTable, uint32_t lineCount)
+{
+    ssize_t bytesWritten;
+    const CSV_ENTRY * entry;
+    FsFile file;
+    uint32_t lineNumber;
+    bool success;
+
+    do
+    {
+        success = false;
+
+        FsFile file;
+        if (!file.open(CSV_FILE, O_WRONLY | O_CREAT | O_TRUNC))
+        {
+            Serial.printf("Error opening %s\r\n", entry->_filePath);
+            break;
+        }
+
+        //------------------------------------------------------
+        // The CSV file contains:
+        //
+        //  Line    Description
+        //    0     Display Minutes,Displayed Files Before CSV File Update
+        //    1     minutes,file count
+        //    2     Debug enable=1 disable=0,Not Used
+        //    3     debuggingEnabled,reserved
+        //    4     SD_Card_File_Name,Network_Path
+        //    5     file_1,url_1
+        //    6     file_2,url_3
+        //    n     ***
+        //------------------------------------------------------
+
+        // Line 0) Add display minutes,files before update header
+        bytesWritten = file.printf("Display Minutes,Displayed Files Before CSV File Update\n");
+        if (bytesWritten < 0)
+        {
+            Serial.println("ERROR: Failed to write to SD card!");
+            success = false;
+            break;
+        }
+
+        // Line 1) Add the parameters
+        bytesWritten = file.printf("%d,%d\n",
+                                   displayMinutes,
+                                   imagesBeforeCsvUpdate);
+        if (bytesWritten < 0)
+        {
+            Serial.println("ERROR: Failed to write to SD card!");
+            success = false;
+            break;
+        }
+
+        // Line 2) Add the debugging header line
+        bytesWritten = file.printf("Debug enable=1 disable=0,Display CSV and SD Card Files\n");
+        if (bytesWritten < 0)
+        {
+            Serial.println("ERROR: Failed to write to SD card!");
+            success = false;
+            break;
+        }
+
+        // Line 3) Add the debuggingEnabled line
+        bytesWritten = file.printf("%d,%d\n", debuggingEnabled, displayFiles);
+        if (bytesWritten < 0)
+        {
+            Serial.println("ERROR: Failed to write to SD card!");
+            success = false;
+            break;
+        }
+
+        // Line 4) Add the file,url header line
+        bytesWritten = file.print("SD_Card_File_Name,Network_Path\n");
+        if (bytesWritten < 0)
+        {
+            Serial.println("ERROR: Failed to write to SD card!");
+            success = false;
+            break;
+        }
+
+        //------------------------------------------------------
+        // Add the files
+        //------------------------------------------------------
+
+        // Add the CSV file to the SD card
+        lineNumber = HEADER_LINE_COUNT;
+        entry = &csvTable[lineNumber];
+        Serial.println("Found CSV file on SD card");
+
+        // Rebuild the contents of the .CSV file
+        while (entry)
+        {
+            // Write the file and URL to the SD card
+            bytesWritten = file.printf("%s,%s\n", entry->_filePath, entry->_url);
+            if (bytesWritten < 0)
+            {
+                Serial.println("ERROR: Failed to write to SD card!");
+                success = false;
+                break;
+            }
+
+            // Get the next CSV file entry
+            entry = (++lineNumber < lineCount) ? entry + 1 : nullptr;
+        }
+
+        // Close the .CSV file
+        file.close();
+        success = true;
+    } while (0);
     return success;
 }
