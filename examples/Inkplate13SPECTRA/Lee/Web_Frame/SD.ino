@@ -547,6 +547,55 @@ bool sdCardDirectoryListing(const char * path, bool walkTree)
 }
 
 //----------------------------------------
+// Display the contents of the URL
+//----------------------------------------
+bool sdCardDisplayFile(const char * filePath)
+{
+    SdFile file;
+    bool success;
+
+    // Display the file path
+    Serial.println(filePath);
+
+    // Open the file
+    success = false;
+    if (file.open(filePath, O_RDONLY) == false)
+        Serial.printf("Failed to open file %s\r\n", filePath);
+    else
+    {
+        // Locate the image extension
+        const char * extension = &filePath[strlen(filePath) -1];
+        while (*extension != '.')
+            extension -= 1;
+
+        // Select routine based upon the image extension
+        if (strcmp(extension, ".bmp") == 0)
+        {
+            Serial.println("Loading .BMP image");
+            success = display.image.drawBitmapFromSd(&file, 0, 0, false, false);
+        }
+        else if ((strcmp(extension, ".jpg") == 0) || (strcmp(extension, ".jpeg") == 0))
+        {
+            // Download and draw the JPEG image directly from the web
+            // Function returns 1 on success and 0 on failure
+            Serial.println("Loading .JPG image");
+            success = display.image.drawJpegFromSd(&file, 0, 0, false, false);
+        }
+        else if (strcmp(extension, ".png") == 0)
+        {
+            Serial.println("Loading .PNG image");
+            success = display.image.drawPngFromSd(&file, 0, 0, false, false);
+        }
+
+        // Done with the file
+        file.close();
+    }
+    if (debugPrint)
+        debugPrint->printf("sdCardDisplayFile returning %d\r\n", success);
+    return success;
+}
+
+//----------------------------------------
 // Display a file table entry
 //----------------------------------------
 void sdCardDisplayFileInfoTableEntry(const FILE_INFO * fileInfo)
@@ -577,79 +626,6 @@ void sdCardDisplayFileInfoTableHeader(uint32_t fileCount)
     }
 }
 
-//----------------------------------------
-// Handle SD card fatal errors
-//----------------------------------------
-void sdCardErrorHalt()
-{
-    if (!sdCard)
-    {
-        Serial.println("ERROR: Invalid SD_CONFIG");
-    }
-    else if (sdCard->errorCode())
-    {
-        if (sdCard->errorCode() == SD_CARD_ERROR_CMD0)
-        {
-            Serial.println("ERROR: No card, wrong chip select pin, or wiring error?");
-        }
-        uint8_t errorCode = sdCard->errorCode();
-        Serial.printf("SD errorCode = 0x%08x, ", errorCode);
-        printSdErrorSymbol(&Serial, errorCode);
-        Serial.print(", ");
-        printSdErrorText(&Serial, errorCode);
-        Serial.println();
-
-        Serial.printf("SD errorData = %d\r\n", sdCard->errorData());
-    }
-    while (true)
-    {
-    }
-}
-
-//----------------------------------------
-// flash erase all data
-//----------------------------------------
-uint32_t const ERASE_SIZE = 262144L;
-bool sdCardEraseCard()
-{
-    bool success;
-    Serial.println("Erasing");
-    uint32_t firstBlock = 0;
-    uint32_t lastBlock;
-    uint16_t n = 0;
-
-    success = false;
-    do
-    {
-        lastBlock = firstBlock + ERASE_SIZE - 1;
-        if (lastBlock >= cardSectorCount)
-        {
-            lastBlock = cardSectorCount - 1;
-        }
-        if (!sdCard->erase(firstBlock, lastBlock))
-        {
-            Serial.println("ERROR: erase failed");
-            sdCardErrorHalt();
-        }
-        Serial.print(".");
-        if ((n++) % 64 == 63)
-        {
-            Serial.println();
-        }
-        firstBlock += ERASE_SIZE;
-    } while (firstBlock < cardSectorCount);
-    Serial.println();
-
-    if (!sdCard->readSector(0, sectorBuffer))
-    {
-        Serial.println("ERROR: readBlock");
-        sdCardErrorHalt();
-    }
-    success = true;
-    Serial.printf("All data set to 0x%02x\r\n", sectorBuffer[0]);
-    Serial.println("Erase done");
-    return success;
-}
 
 //----------------------------------------
 // Display an image from the SD card
@@ -717,6 +693,80 @@ bool sdCardDisplayImage()
     if (debugPrint)
         debugPrint->printf("sdCardDisplayImage returning %d\r\n", success);
     return success;
+}
+
+//----------------------------------------
+// flash erase all data
+//----------------------------------------
+uint32_t const ERASE_SIZE = 262144L;
+bool sdCardEraseCard()
+{
+    bool success;
+    Serial.println("Erasing");
+    uint32_t firstBlock = 0;
+    uint32_t lastBlock;
+    uint16_t n = 0;
+
+    success = false;
+    do
+    {
+        lastBlock = firstBlock + ERASE_SIZE - 1;
+        if (lastBlock >= cardSectorCount)
+        {
+            lastBlock = cardSectorCount - 1;
+        }
+        if (!sdCard->erase(firstBlock, lastBlock))
+        {
+            Serial.println("ERROR: erase failed");
+            sdCardErrorHalt();
+        }
+        Serial.print(".");
+        if ((n++) % 64 == 63)
+        {
+            Serial.println();
+        }
+        firstBlock += ERASE_SIZE;
+    } while (firstBlock < cardSectorCount);
+    Serial.println();
+
+    if (!sdCard->readSector(0, sectorBuffer))
+    {
+        Serial.println("ERROR: readBlock");
+        sdCardErrorHalt();
+    }
+    success = true;
+    Serial.printf("All data set to 0x%02x\r\n", sectorBuffer[0]);
+    Serial.println("Erase done");
+    return success;
+}
+
+//----------------------------------------
+// Handle SD card fatal errors
+//----------------------------------------
+void sdCardErrorHalt()
+{
+    if (!sdCard)
+    {
+        Serial.println("ERROR: Invalid SD_CONFIG");
+    }
+    else if (sdCard->errorCode())
+    {
+        if (sdCard->errorCode() == SD_CARD_ERROR_CMD0)
+        {
+            Serial.println("ERROR: No card, wrong chip select pin, or wiring error?");
+        }
+        uint8_t errorCode = sdCard->errorCode();
+        Serial.printf("SD errorCode = 0x%08x, ", errorCode);
+        printSdErrorSymbol(&Serial, errorCode);
+        Serial.print(", ");
+        printSdErrorText(&Serial, errorCode);
+        Serial.println();
+
+        Serial.printf("SD errorData = %d\r\n", sdCard->errorData());
+    }
+    while (true)
+    {
+    }
 }
 
 //----------------------------------------
@@ -928,62 +978,6 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable, uint32_t lineCount)
     if (debugPrint)
         debugPrint->printf("sdCardSelectFile returning %d\r\n", success);
     return success;
-}
-
-//----------------------------------------
-// Display the contents of the URL
-//----------------------------------------
-bool sdCardDisplayFile(const char * filePath)
-{
-    SdFile file;
-    bool success;
-
-    // Display the file path
-    Serial.println(filePath);
-
-    // Open the file
-    success = false;
-    if (file.open(filePath, O_RDONLY) == false)
-        Serial.printf("Failed to open file %s\r\n", filePath);
-    else
-    {
-        // Locate the image extension
-        const char * extension = &filePath[strlen(filePath) -1];
-        while (*extension != '.')
-            extension -= 1;
-
-        // Select routine based upon the image extension
-        if (strcmp(extension, ".bmp") == 0)
-        {
-            Serial.println("Loading .BMP image");
-            success = display.image.drawBitmapFromSd(&file, 0, 0, false, false);
-        }
-        else if ((strcmp(extension, ".jpg") == 0) || (strcmp(extension, ".jpeg") == 0))
-        {
-            // Download and draw the JPEG image directly from the web
-            // Function returns 1 on success and 0 on failure
-            Serial.println("Loading .JPG image");
-            success = display.image.drawJpegFromSd(&file, 0, 0, false, false);
-        }
-        else if (strcmp(extension, ".png") == 0)
-        {
-            Serial.println("Loading .PNG image");
-            success = display.image.drawPngFromSd(&file, 0, 0, false, false);
-        }
-
-        // Done with the file
-        file.close();
-    }
-    if (debugPrint)
-        debugPrint->printf("sdCardDisplayFile returning %d\r\n", success);
-    return success;
-}
-
-//----------------------------------------
-// Format the SD card
-//----------------------------------------
-bool sdCardFormat()
-{
 }
 
 //----------------------------------------

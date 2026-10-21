@@ -52,43 +52,6 @@
 #include "secrets.h"
 
 //----------------------------------------
-// Constants
-//----------------------------------------
-
-#define CHARGE_VOLTAGE                  3.6
-
-#define HEADER_LINE_COUNT               5
-
-#define MICROSECONDS_IN_A_MILLISECOND   1000ull
-#define MILLISECONDS_IN_A_SECOND        1000ull
-#define SECONDS_IN_A_MINUTE             60ull
-
-#define MICROSECONDS_IN_A_SECOND    (MICROSECONDS_IN_A_MILLISECOND * MILLISECONDS_IN_A_SECOND)
-#define MICROSECONDS_IN_A_MINUTE    (MICROSECONDS_IN_A_SECOND * SECONDS_IN_A_MINUTE)
-
-#define NETWORK_TIMEOUT             ((uint32_t)(15 * MICROSECONDS_IN_A_MINUTE))
-#define DATA_TIMEOUT                (15 * MILLISECONDS_IN_A_SECOND)
-
-#define DISPLAY_WIDTH       1600
-#define DISPLAY_HEIGHT      1200
-
-//----------------------------------------
-// Globals
-//----------------------------------------
-
-char batteryVoltageString[64];
-Print * debugPrint;
-Inkplate display;
-
-volatile RTC_DATA_ATTR uint32_t imageNumber;    // Image number to display
-volatile RTC_DATA_ATTR uint16_t displayMinutes; // Image display time in minutes
-volatile RTC_DATA_ATTR uint16_t imagesBeforeCsvUpdate;  // Time between CSV file updates
-                                                        // ~= displayMinutes * imagesBeforeCsvUpdate
-volatile RTC_DATA_ATTR bool debuggingEnabled;   // Enable or disable debugging output
-volatile RTC_DATA_ATTR bool displayFiles;       // Display files when true
-RTC_DATA_ATTR float batteryVoltage;             // Battery voltage
-
-//----------------------------------------
 // Type declarations
 //----------------------------------------
 
@@ -125,6 +88,43 @@ typedef bool (* SD_CARD_PROCESS_FILES)(const FILE_INFO ** fileTable,
                                        void * context);
 
 //----------------------------------------
+// Globals
+//----------------------------------------
+
+char batteryVoltageString[64];
+Print * debugPrint;
+Inkplate display;
+
+volatile RTC_DATA_ATTR uint32_t imageNumber;    // Image number to display
+volatile RTC_DATA_ATTR uint16_t displayMinutes; // Image display time in minutes
+volatile RTC_DATA_ATTR uint16_t imagesBeforeCsvUpdate;  // Time between CSV file updates
+                                                        // ~= displayMinutes * imagesBeforeCsvUpdate
+volatile RTC_DATA_ATTR bool debuggingEnabled;   // Enable or disable debugging output
+volatile RTC_DATA_ATTR bool displayFiles;       // Display files when true
+RTC_DATA_ATTR float batteryVoltage;             // Battery voltage
+
+//----------------------------------------
+// Constants
+//----------------------------------------
+
+#define CHARGE_VOLTAGE                  3.6
+
+#define HEADER_LINE_COUNT               5
+
+#define MICROSECONDS_IN_A_MILLISECOND   1000ull
+#define MILLISECONDS_IN_A_SECOND        1000ull
+#define SECONDS_IN_A_MINUTE             60ull
+
+#define MICROSECONDS_IN_A_SECOND    (MICROSECONDS_IN_A_MILLISECOND * MILLISECONDS_IN_A_SECOND)
+#define MICROSECONDS_IN_A_MINUTE    (MICROSECONDS_IN_A_SECOND * SECONDS_IN_A_MINUTE)
+
+#define NETWORK_TIMEOUT             ((uint32_t)(15 * MICROSECONDS_IN_A_MINUTE))
+#define DATA_TIMEOUT                (15 * MILLISECONDS_IN_A_SECOND)
+
+#define DISPLAY_WIDTH       1600
+#define DISPLAY_HEIGHT      1200
+
+//----------------------------------------
 // Starting point for the application
 //----------------------------------------
 void setup()
@@ -150,8 +150,8 @@ void setup()
     display.clearDisplay();
     display.setTextColor(INKPLATE_BLACK);
 
-    // Display the battery voltage
-    displayBatteryVoltage();
+    // Get the battery voltage
+    getBatteryVoltage();
 
     // Display an image from the SD card or the network
     success = sdCardDisplayImage();
@@ -195,6 +195,28 @@ void setup()
 }
 
 //----------------------------------------
+// loop - Called multiple times, each time executes a single pass
+//----------------------------------------
+void loop()
+{
+    // Never here! If you are using deep sleep, the whole program should be in setup() because the board restarts each
+    // time. loop() must be empty!
+}
+
+//----------------------------------------
+// Enter deep sleep
+//----------------------------------------
+void deepSleep()
+{
+    // Enable push button wakup from deep sleep on gpio 18
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_18, 0);
+
+    // Start deep sleep (this function does not return). Program stops here.
+    Serial.print("Going to sleep\r\n\n\n");
+    esp_deep_sleep_start();
+}
+
+//----------------------------------------
 // Display the battery voltage at the bottom of the screen
 //----------------------------------------
 void displayBatteryVoltageOverlay()
@@ -231,28 +253,6 @@ void displayBatteryVoltageOverlay()
 }
 
 //----------------------------------------
-// Enter deep sleep
-//----------------------------------------
-void deepSleep()
-{
-    // Enable push button wakup from deep sleep on gpio 18
-    esp_sleep_enable_ext0_wakeup(GPIO_NUM_18, 0);
-
-    // Start deep sleep (this function does not return). Program stops here.
-    Serial.print("Going to sleep\r\n\n\n");
-    esp_deep_sleep_start();
-}
-
-//----------------------------------------
-// loop - Called multiple times, each time executes a single pass
-//----------------------------------------
-void loop()
-{
-    // Never here! If you are using deep sleep, the whole program should be in setup() because the board restarts each
-    // time. loop() must be empty!
-}
-
-//----------------------------------------
 // Draw text centered on the line
 //----------------------------------------
 void drawCenteredText(int16_t x, int16_t y, const char * text)
@@ -272,9 +272,57 @@ void drawCenteredText(int16_t x, int16_t y, const char * text)
 }
 
 //----------------------------------------
-// Display the battery voltage
+// Dump a buffer in hex and ASCII
 //----------------------------------------
-void displayBatteryVoltage()
+void dumpBuffer(size_t offset, const uint8_t *buffer, size_t length)
+{
+    int bytes;
+    const uint8_t *end;
+    int index;
+
+    end = &buffer[length];
+    while (buffer < end)
+    {
+        // Determine the number of bytes to display on the line
+        bytes = end - buffer;
+        if (bytes > (16 - (offset & 0xf)))
+            bytes = 16 - (offset & 0xf);
+
+        // Display the offset
+        Serial.printf("0x%08lx: ", offset);
+
+        // Skip leading bytes
+        for (index = 0; index < (offset & 0xf); index++)
+            Serial.printf("   ");
+
+        // Display the data bytes
+        for (index = 0; index < bytes; index++)
+            Serial.printf("%02X ", buffer[index]);
+
+        // Separate the data bytes from the ASCII
+        for (; index < (16 - (offset & 0xf)); index++)
+            Serial.printf("   ");
+        Serial.printf(" ");
+
+        // Skip leading bytes
+        for (index = 0; index < (offset & 0xf); index++)
+            Serial.printf(" ");
+
+        // Display the ASCII values
+        for (index = 0; index < bytes; index++)
+            Serial.printf("%c", ((buffer[index] < ' ') || (buffer[index] >= 0x7f)) ? '.' : buffer[index]);
+        Serial.printf("\r\n");
+
+        // Set the next line of data
+        buffer += bytes;
+        offset += bytes;
+    }
+}
+
+//----------------------------------------
+// Get the battery voltage
+//----------------------------------------
+void getBatteryVoltage()
 {
     uint16_t h;
     const int loopCount = 8;
@@ -324,54 +372,6 @@ void displayBatteryVoltage()
 
         // Enter sleep mode
         deepSleep();
-    }
-}
-
-//----------------------------------------
-// Dump a buffer in hex and ASCII
-//----------------------------------------
-void dumpBuffer(size_t offset, const uint8_t *buffer, size_t length)
-{
-    int bytes;
-    const uint8_t *end;
-    int index;
-
-    end = &buffer[length];
-    while (buffer < end)
-    {
-        // Determine the number of bytes to display on the line
-        bytes = end - buffer;
-        if (bytes > (16 - (offset & 0xf)))
-            bytes = 16 - (offset & 0xf);
-
-        // Display the offset
-        Serial.printf("0x%08lx: ", offset);
-
-        // Skip leading bytes
-        for (index = 0; index < (offset & 0xf); index++)
-            Serial.printf("   ");
-
-        // Display the data bytes
-        for (index = 0; index < bytes; index++)
-            Serial.printf("%02X ", buffer[index]);
-
-        // Separate the data bytes from the ASCII
-        for (; index < (16 - (offset & 0xf)); index++)
-            Serial.printf("   ");
-        Serial.printf(" ");
-
-        // Skip leading bytes
-        for (index = 0; index < (offset & 0xf); index++)
-            Serial.printf(" ");
-
-        // Display the ASCII values
-        for (index = 0; index < bytes; index++)
-            Serial.printf("%c", ((buffer[index] < ' ') || (buffer[index] >= 0x7f)) ? '.' : buffer[index]);
-        Serial.printf("\r\n");
-
-        // Set the next line of data
-        buffer += bytes;
-        offset += bytes;
     }
 }
 
