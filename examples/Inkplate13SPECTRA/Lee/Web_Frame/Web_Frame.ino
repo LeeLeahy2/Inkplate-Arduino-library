@@ -348,32 +348,7 @@ void getBatteryVoltage()
     Serial.printf("Battery Voltage: %4.2fV\r\n", batteryVoltage);
     sprintf(batteryVoltageString, "Battery: %4.2fV", batteryVoltage);
     if ((batteryVoltage < CHARGE_VOLTAGE) && (previousBatteryVoltage >= batteryVoltage))
-    {
-        x = 25;
-        y = 0;
-        int16_t vSpacing = 200;
-
-        // Request USB cable
-        y += vSpacing;
-        display.clearDisplay();     // Clear the frame buffer (does NOT clear the physical screen)
-        display.setTextSize(20);    // Set text size (uint8_t, default is 1)
-        drawCenteredText(y, "Plug In");
-
-        y += vSpacing;
-        drawCenteredText(y, "USB Cable");
-
-        // Display the voltage
-        y += vSpacing;
-        y += vSpacing;
-        display.setTextSize(18);    // Set text size (uint8_t, default is 1)
-        drawCenteredText(y, batteryVoltageString);
-
-        // Refresh the e-paper display to show changes
-        display.display();
-
-        // Enter sleep mode
-        deepSleep();
-    }
+        requestUsbCable(batteryVoltageString);
 }
 
 //----------------------------------------
@@ -409,4 +384,35 @@ void reportHeapNow(bool includePsram)
     else
         Serial.printf("FreeHeap: %d / HeapLowestPoint: %d / LargestBlock: %d\r\n", ESP.getFreeHeap(),
                       xPortGetMinimumEverFreeHeapSize(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
+
+//----------------------------------------
+// Request the USB cable
+//----------------------------------------
+void requestUsbCable(const char * batteryVoltageString)
+{
+    int16_t x = 25;
+    int16_t y = 0;
+    int16_t vSpacing = 200;
+
+    // Request USB cable
+    y += vSpacing;
+    display.clearDisplay();     // Clear the frame buffer (does NOT clear the physical screen)
+    display.setTextSize(20);    // Set text size (uint8_t, default is 1)
+    drawCenteredText(y, "Plug In");
+
+    y += vSpacing;
+    drawCenteredText(y, "USB Cable");
+
+    // Display the voltage
+    y += vSpacing;
+    y += vSpacing;
+    display.setTextSize(18);    // Set text size (uint8_t, default is 1)
+    drawCenteredText(y, batteryVoltageString);
+
+    // Refresh the e-paper display to show changes
+    display.display();
+
+    // Enter sleep mode
+    deepSleep();
 }
