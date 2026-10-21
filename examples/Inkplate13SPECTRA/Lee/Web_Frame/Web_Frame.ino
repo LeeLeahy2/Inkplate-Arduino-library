@@ -255,10 +255,11 @@ void displayBatteryVoltageOverlay()
 //----------------------------------------
 // Draw text centered on the line
 //----------------------------------------
-void drawCenteredText(int16_t x, int16_t y, const char * text)
+void drawCenteredText(int16_t y, const char * text)
 {
     uint16_t h;
     uint16_t w;
+    int16_t x;
     int16_t x1;
     int16_t y1;
 
@@ -356,16 +357,16 @@ void getBatteryVoltage()
         y += vSpacing;
         display.clearDisplay();     // Clear the frame buffer (does NOT clear the physical screen)
         display.setTextSize(20);    // Set text size (uint8_t, default is 1)
-        drawCenteredText(x, y, "Plug In");
+        drawCenteredText(y, "Plug In");
 
         y += vSpacing;
-        drawCenteredText(x, y, "USB Cable");
+        drawCenteredText(y, "USB Cable");
 
         // Display the voltage
         y += vSpacing;
         y += vSpacing;
         display.setTextSize(18);    // Set text size (uint8_t, default is 1)
-        drawCenteredText(x, y, batteryVoltageString);
+        drawCenteredText(y, batteryVoltageString);
 
         // Refresh the e-paper display to show changes
         display.display();
