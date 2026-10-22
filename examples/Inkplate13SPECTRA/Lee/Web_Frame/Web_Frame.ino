@@ -91,6 +91,33 @@ typedef bool (* SD_CARD_PROCESS_FILES)(const FILE_INFO ** fileTable,
 typedef bool (*SD_CARD_WRITE_CSV_FILE)(const char * csvData,
                                        size_t fileBytes);
 
+enum TYPE_OF_PARAMETER
+{
+    // Standard types
+    TYPE_BOOL = 0,  //  0
+    TYPE_INT,       //  1
+    TYPE_INT8,      //  2
+    TYPE_INT16,     //  3
+    TYPE_INT32,     //  4
+    TYPE_INT64,     //  5
+    TYPE_UINT8,     //  6
+    TYPE_UINT16,    //  7
+    TYPE_UINT32,    //  8
+    TYPE_UINT64,    //  9
+    TYPE_STRING,    // 10
+
+    // Special types
+    TYPE_TENTHS,    // 11
+};
+
+typedef struct _CSV_PARAMETER_ENTRY
+{
+    const char * _parameterName;
+    TYPE_OF_PARAMETER _parameterType;
+    const char * _parameterValue;
+    void * _parameterVariable;
+} CSV_PARAMETER_ENTRY;
+
 class SdFatStream : public Stream
 {
   private:
@@ -133,14 +160,18 @@ class SdFatStream : public Stream
 char batteryVoltageString[64];
 Print * debugPrint;
 Inkplate display;
+volatile bool endOfParameters;  // Indicates all parameter read from CSV file
 
-volatile RTC_DATA_ATTR uint32_t imageNumber;    // Image number to display
-volatile RTC_DATA_ATTR uint16_t displayMinutes; // Image display time in minutes
+
+volatile RTC_DATA_ATTR uint32_t imageNumber;        // Image number to display
+RTC_DATA_ATTR float batteryVoltage;                 // Battery voltage
+
+volatile RTC_DATA_ATTR uint16_t displayMinutes;     // Image display time in minutes
 volatile RTC_DATA_ATTR uint16_t imagesBeforeCsvUpdate;  // Time between CSV file updates
                                                         // ~= displayMinutes * imagesBeforeCsvUpdate
-volatile RTC_DATA_ATTR bool debuggingEnabled;   // Enable or disable debugging output
-volatile RTC_DATA_ATTR bool displayFiles;       // Display files when true
-RTC_DATA_ATTR float batteryVoltage;             // Battery voltage
+volatile RTC_DATA_ATTR bool debuggingEnabled;       // Enable or disable debugging output
+volatile RTC_DATA_ATTR bool displayFiles;           // Display files when true
+volatile RTC_DATA_ATTR bool overlayBatteryVoltage;  // Display battery voltage overlay
 
 //----------------------------------------
 // Constants
@@ -167,6 +198,29 @@ RTC_DATA_ATTR float batteryVoltage;             // Battery voltage
 
 #define CSV_FILE                    "Pictures.csv"
 #define TEMPORARY_CSV_FILE          "Temp.csv"
+
+const CSV_PARAMETER_ENTRY csvParameterTable[] =
+{
+    //      Name                       Type        Value              Variable
+    {"batteryVoltageInTenths",      TYPE_TENTHS,    "36",   (void *)&batteryVoltage},
+    {"debugEnable",                 TYPE_BOOL,      "1",    (void *)&debuggingEnabled},
+    {"overlayBatteryVoltage",       TYPE_BOOL,      "1",    (void *)&overlayBatteryVoltage},
+    {"displayCsvAndSdCardFiles",    TYPE_BOOL,      "1",    (void *)&displayFiles},
+    {"displayMinutes",              TYPE_UINT16,    "1",    (void *)&displayMinutes},
+    {"endOfParameters",             TYPE_BOOL,      "0",    (void *)&endOfParameters},
+    {"imagesBeforeCsvUpdate",       TYPE_UINT16,    "2",    (void *)&imagesBeforeCsvUpdate},
+};
+const int csvParameterTableEntries = sizeof(csvParameterTable) / sizeof(csvParameterTable[0]);
+
+// Adding a new parameter:
+//
+// 1)   Declare the variable for the parameter
+// 2)   Is this a new variable type?  If yes:
+//      a)  Define a new TYPE_* value
+//      b)  Add the new type to the switch statement in parameterSetValue
+// 3)   Use the parameter variable
+// 4)   Add the parameter to Pictures.csv
+// 5)   Update Pictures.csv on the website
 
 //----------------------------------------
 // Starting point for the application
