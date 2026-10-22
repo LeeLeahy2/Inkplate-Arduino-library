@@ -234,15 +234,6 @@ void setup()
     // Display a sign-on message
     Serial.println("Web_Frame application");
 
-    // Set the default values of the parameters
-    if (displayMinutes == 0)
-        displayMinutes = 15;
-    if (imagesBeforeCsvUpdate == 0)
-        imagesBeforeCsvUpdate = 4;
-
-    // Select the debug serial output
-    debugPrint = debuggingEnabled ? &Serial : nullptr;
-
     // Initialize the display
     display.begin();
     display.clearDisplay();
@@ -250,6 +241,15 @@ void setup()
 
     // Get the battery voltage
     getBatteryVoltage();
+
+    // Set the default values of the parameters
+    if (displayMinutes == 0)
+        for (int parameter = 0; parameter < csvParameterTableEntries; parameter++)
+            parameterSetValue(parameter, csvParameterTable[parameter]._parameterValue);
+reportFatalError("All parameters loaded");
+
+    // Select the debug serial output
+    debugPrint = debuggingEnabled ? &Serial : nullptr;
 
     // Display an image from the SD card or the network
     success = sdCardDisplayImage(NETWORK_TIMEOUT);
