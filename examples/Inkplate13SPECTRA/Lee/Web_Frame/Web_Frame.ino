@@ -124,6 +124,8 @@ RTC_DATA_ATTR float batteryVoltage;             // Battery voltage
 #define DISPLAY_WIDTH       1600
 #define DISPLAY_HEIGHT      1200
 
+#define COMMENT_CHARACTER           '#'
+
 #define CSV_FILE                    "Pictures.csv"
 
 //----------------------------------------

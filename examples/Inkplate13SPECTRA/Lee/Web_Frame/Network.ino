@@ -25,6 +25,53 @@ bool NetworkCopyFilesToSdCard(uint32_t timeout)
 }
 
 //----------------------------------------
+// Count the lines in the CSV file
+//----------------------------------------
+uint32_t networkCountCsvLines(char * csvData, size_t fileBytes)
+{
+    char * data;
+    char * dataEnd;
+    uint32_t lineCount;
+    char * lineStart;
+
+    // Separate and count the lines in the .csv file, skipping comment lines
+    lineCount = 0;
+    data = csvData;
+    dataEnd = &data[fileBytes];
+    lineStart = data;
+    while (data < dataEnd)
+    {
+        // Replace linefeeds with a NUL
+        if (*data == '\n')
+        {
+            // Zero-terminate the line
+            *data = 0;
+
+            // Count this line
+            if (*lineStart != COMMENT_CHARACTER)
+                lineCount += 1;
+
+            // Remember the start of the next line
+            lineStart = data + 1;
+        }
+        data += 1;
+    }
+
+    // Determine if the last line is terminated
+    data -= 1;
+    if (*data != 0)
+    {
+        // Zero-terminate the last line
+        *data = 0;
+
+        // Count this line
+        if (*lineStart != COMMENT_CHARACTER)
+            lineCount += 1;
+    }
+    return lineCount;
+}
+
+//----------------------------------------
 // Display an image from the network
 //----------------------------------------
 bool networkDisplayImage(uint32_t timeout)
@@ -280,6 +327,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout
     NetworkClient * csvStream;
     size_t fileBytes;
     HTTPClient https;
+    uint32_t lineCount;
     size_t remainingBytes;
     bool success;
     const char * url;
@@ -348,34 +396,8 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout
         if (data < dataEnd)
             break;
 
-        // Separate and count the lines in the .csv file
-        uint32_t lineCount = 0;
-        data = csvData;
-        dataEnd = &data[fileBytes];
-        while (data < dataEnd)
-        {
-            // Replace linefeeds with a NUL
-            if (*data == '\n')
-            {
-                // Zero-terminate the line
-                *data = 0;
-
-                // Count this line
-                lineCount += 1;
-            }
-            data += 1;
-        }
-
-        // Determine if the last line is terminated
-        data -= 1;
-        if (*data != 0)
-        {
-            // Zero-terminate the last line
-            *data = 0;
-
-            // Count this line
-            lineCount += 1;
-        }
+        // Separate and count the lines in the .csv file, skipping comment lines
+        lineCount = networkCountCsvLines(csvData, fileBytes);
 
         // Check for an empty file
         if (lineCount == 0)
