@@ -531,6 +531,14 @@ bool networkServerConnectUsingUrl(const char * url,
 //----------------------------------------
 void networkStart()
 {
+    if (WIFI_SSID_ENTRIES != WIFI_PASSWORD_ENTRIES)
+    {
+        Serial.println("Fix WIFI_SSID_ENTRIES and WIFI_PASSWORD_ENTRIES");
+        Serial.println("Halting...");
+        while (1)
+            delay(1000);
+    }
+
     // Attempt to connect to the network
     Serial.println("Starting WiFi network");
     while (display.connectWiFiMulti(WIFI_SSID_ENTRIES, ssid, password) == false)
