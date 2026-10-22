@@ -87,6 +87,45 @@ typedef bool (* SD_CARD_PROCESS_FILES)(const FILE_INFO ** fileTable,
                                        uint32_t fileCount,
                                        void * context);
 
+// Callback routine to write the CSV file
+typedef bool (*SD_CARD_WRITE_CSV_FILE)(const char * csvData,
+                                       size_t fileBytes);
+
+class SdFatStream : public Stream
+{
+  private:
+    SdFile * _file;
+
+  public:
+    SdFatStream(SdFile * file)
+    {
+        _file = file;
+    }
+
+    int available()
+    {
+        return _file->available();
+    }
+
+    int read(uint8_t *buf, size_t size)
+    {
+        return _file->read((void *)buf, size);
+    }
+
+    int read()
+    {
+        uint8_t byte;
+        ssize_t bytesRead;
+
+        bytesRead = _file->read((void *)&byte, sizeof(byte));
+        return (bytesRead = 1) ? byte : bytesRead;
+    }
+
+    virtual int peek() override { return _file->peek(); }
+    virtual void flush() override {}
+    virtual size_t write(uint8_t val) override { return 0; }
+};
+
 //----------------------------------------
 // Globals
 //----------------------------------------
@@ -127,6 +166,7 @@ RTC_DATA_ATTR float batteryVoltage;             // Battery voltage
 #define COMMENT_CHARACTER           '#'
 
 #define CSV_FILE                    "Pictures.csv"
+#define TEMPORARY_CSV_FILE          "Temp.csv"
 
 //----------------------------------------
 // Starting point for the application
@@ -158,7 +198,7 @@ void setup()
     getBatteryVoltage();
 
     // Display an image from the SD card or the network
-    success = sdCardDisplayImage();
+    success = sdCardDisplayImage(NETWORK_TIMEOUT);
     if (success == false)
         success = networkDisplayImage(NETWORK_TIMEOUT);
 

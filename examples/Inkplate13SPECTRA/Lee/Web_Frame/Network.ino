@@ -90,7 +90,9 @@ bool NetworkCopyFilesToSdCard(uint32_t timeout)
     bool success;
 
     // Load, parse and sort the CSV file
-    success = networkReadCsvFile(sdCardCopyNetworkFiles, timeout);
+    success = networkReadCsvFile(sdCardWriteTemporaryCsvFile,
+                                 sdCardCopyNetworkFiles,
+                                 timeout);
     if (debugPrint)
         debugPrint->printf("NetworkCopyFilesToSdCard returning %d\r\n", success);
     return success;
@@ -151,7 +153,7 @@ bool networkDisplayImage(uint32_t timeout)
     bool success;
 
     // Load, parse and sort the CSV file
-    success = networkReadCsvFile(networkSelectImage, timeout);
+    success = networkReadCsvFile(nullptr, networkSelectImage, timeout);
     return success;
 }
 
@@ -390,37 +392,56 @@ bool networkParseCsvFileParameters(const CSV_ENTRY * csvTable, uint32_t lineCoun
 //----------------------------------------
 // Read the CSV file from the network
 //----------------------------------------
-bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout)
+bool networkReadCsvFile(SD_CARD_WRITE_CSV_FILE writeCsvFile,
+                        NETWORK_PROCESS_CSV_LINES processLines,
+                        uint32_t timeout)
+{
+    NetworkClient * csvStream;
+    size_t fileBytes;
+    HTTPClient https;
+    bool success;
+
+    // Start the network
+    networkStart();
+
+    // Attempt to open the .CSV file
+    success = networkServerConnectUsingUrl(csvFileUrl,
+                                           csvStream,
+                                           https,
+                                           fileBytes);
+    if (success)
+        // Read and process the CSV file
+        success = networkReadCsvFileFromStream(csvStream,
+                                               fileBytes,
+                                               writeCsvFile,
+                                               processLines,
+                                               timeout);
+    https.end();
+    return success;
+}
+
+//----------------------------------------
+// Read the CSV file from a stream
+//----------------------------------------
+bool networkReadCsvFileFromStream(Stream * csvStream,
+                                  size_t fileBytes,
+                                  SD_CARD_WRITE_CSV_FILE writeCsvFile,
+                                  NETWORK_PROCESS_CSV_LINES processLines,
+                                  uint32_t timeout)
 {
     char * csvData;
     CSV_ENTRY * csvEntry;
     CSV_ENTRY * csvTable;
     CSV_ENTRY * csvTemp;
-    NetworkClient * csvStream;
-    size_t fileBytes;
-    HTTPClient https;
     uint32_t lineCount;
     size_t remainingBytes;
     bool success;
-    const char * url;
 
     do
     {
         success = false;
         csvData = nullptr;
         csvTable = nullptr;
-
-        // Start the network
-        networkStart();
-
-        // Attempt to open the .CSV file
-        if (networkServerConnectUsingUrl(csvFileUrl,
-                                         csvStream,
-                                         https,
-                                         fileBytes) == false)
-        {
-            break;
-        }
 
         // Allocate space for the CSV file
         csvData = (char *)malloc(fileBytes + 1);
@@ -434,38 +455,14 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout
         csvData[fileBytes] = 0;
 
         // Read the .CSV file
-        Serial.println("Reading CSV file from network");
-        char * data = csvData;
-        char * dataEnd = &data[fileBytes];
-        uint32_t timerStart = millis();
-        while (data < dataEnd)
-        {
-            // Wait for some data
-            size_t bytesToRead = csvStream->available();
-            if (bytesToRead == 0)
-            {
-                // Check for timeout
-                if ((millis() - timerStart) > timeout)
-                {
-                    Serial.println("ERROR: Timed out reading .CSV file");
-                    break;
-                }
-                delay(1);
-                continue;
-            }
+        if (networkReadCsvFileIntoDataBuffer(csvStream,
+                                             csvData,
+                                             fileBytes,
+                                             timeout) == false)
+            break;
 
-            // Read data into the buffer
-            ssize_t bytesRead = csvStream->read((uint8_t *)data, bytesToRead);
-            if (bytesRead < 0)
-            {
-                Serial.println("ERROR: Failed to read .CSV file!");
-                break;
-            }
-
-            // Account for this data
-            data += bytesRead;
-        }
-        if (data < dataEnd)
+        // Write the .CSV file to the SD card
+        if (writeCsvFile && writeCsvFile(csvData, fileBytes) == false)
             break;
 
         // Separate and count the lines in the .csv file, skipping comment lines
@@ -484,6 +481,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout
 
         // Sort the entries
         for (int i = HEADER_LINE_COUNT; i < (lineCount - 1); i++)
+        {
             for (int j = i + 1; j < lineCount; j++)
             {
                 if (strcasecmp(csvTable[i]._filePath, csvTable[j]._filePath) > 0)
@@ -500,6 +498,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout
                     csvTable[j]._url = temp;
                 }
             }
+        }
 
         // Process the CSV file
         if (processLines)
@@ -511,8 +510,50 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout
         free(csvTable);
     if (csvData)
         free(csvData);
-    https.end();
     return success;
+}
+
+//----------------------------------------
+// Read in the CSV file
+//----------------------------------------
+bool networkReadCsvFileIntoDataBuffer(Stream * csvStream,
+                                      char * csvData,
+                                      size_t fileBytes,
+                                      uint32_t timeout)
+{
+    // Read the .CSV file
+    Serial.println("Reading CSV file from network");
+    char * data = csvData;
+    char * dataEnd = &data[fileBytes];
+    uint32_t timerStart = millis();
+    while (data < dataEnd)
+    {
+        // Wait for some data
+        size_t bytesToRead = csvStream->available();
+        if (bytesToRead == 0)
+        {
+            // Check for timeout
+            if ((millis() - timerStart) > timeout)
+            {
+                Serial.println("ERROR: Timed out reading .CSV file");
+                break;
+            }
+            delay(1);
+            continue;
+        }
+
+        // Read data into the buffer
+        ssize_t bytesRead = csvStream->readBytes((uint8_t *)data, bytesToRead);
+        if (bytesRead < 0)
+        {
+            Serial.println("ERROR: Failed to read .CSV file!");
+            break;
+        }
+
+        // Account for this data
+        data += bytesRead;
+    }
+    return (data == dataEnd);
 }
 
 //----------------------------------------
