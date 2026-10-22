@@ -11,6 +11,78 @@
  **************************************************/
 
 //----------------------------------------
+// Build the csvTable
+//----------------------------------------
+bool networkBuildCsvTable(char * csvData,
+                          size_t fileBytes,
+                          uint32_t lineCount,
+                          CSV_ENTRY ** csvTable)
+{
+    CSV_ENTRY * csvEntry;
+    char * data;
+    char * dataEnd;
+    bool success;
+
+    do
+    {
+        success = false;
+
+        // Check for an empty file
+        if (lineCount <= HEADER_LINE_COUNT)
+        {
+            Serial.println("ERROR: CSV file does not contain any images to display!");
+            break;
+        }
+
+        // Allocate the CSV table
+        *csvTable = (CSV_ENTRY *)malloc(lineCount * sizeof(CSV_ENTRY));
+        if (csvTable == nullptr)
+        {
+            Serial.println("ERROR: Failed to allocate CSV table");
+            break;
+        }
+
+        // Walk the lines in the CSV file
+        csvEntry = *csvTable;
+        data = csvData;
+        dataEnd = &data[fileBytes];
+        while (data < dataEnd)
+        {
+            // Skip comment lines
+            if (*data == COMMENT_CHARACTER)
+            {
+                data += strlen(data) + 1;
+                continue;
+            }
+
+            // Save the beginning of the line
+            csvEntry->_filePath = data;
+
+            // Locate the comma separation
+            while (*data)
+            {
+                if (*data == ',')
+                {
+                    // Zero-terminate the file path
+                    *data++ = 0;
+                    break;
+                }
+                data += 1;
+            }
+
+            // Save the URL
+            csvEntry->_url = data;
+
+            // Get the next line and csvEntry
+            data += strlen(data) + 1;
+            csvEntry += 1;
+        }
+        success = true;
+    } while (0);
+    return success;
+}
+
+//----------------------------------------
 // SD card copy the network files
 //----------------------------------------
 bool NetworkCopyFilesToSdCard(uint32_t timeout)
@@ -400,54 +472,15 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines, uint32_t timeout
         lineCount = networkCountCsvLines(csvData, fileBytes);
 
         // Check for an empty file
-        if (lineCount == 0)
+        if (lineCount <= HEADER_LINE_COUNT)
         {
-            Serial.println("ERROR: Empty .CSV found, no image to display!");
+            Serial.println("ERROR: CSV file does not contain any images to display!");
             break;
         }
 
-        // Check for a file with just a header
-        if (lineCount == 1)
-        {
-            Serial.println("ERROR: Header line found but no image to display!");
+        // Build the csvTable
+        if (networkBuildCsvTable(csvData, fileBytes, lineCount, &csvTable) == false)
             break;
-        }
-
-        // Allocate the CSV table
-        csvTable = (CSV_ENTRY *)malloc(lineCount * sizeof(CSV_ENTRY));
-        if (csvTable == nullptr)
-        {
-            Serial.println("ERROR: Failed to allocate CSV table");
-            break;
-        }
-
-        // Walk the lines in the CSV file
-        csvEntry = csvTable;
-        data = csvData;
-        dataEnd = &data[fileBytes];
-        while (data < dataEnd)
-        {
-            csvEntry->_filePath = data;
-
-            // Locate the comma separation
-            while (*data)
-            {
-                if (*data == ',')
-                {
-                    // Zero-terminate the file path
-                    *data++ = 0;
-                    break;
-                }
-                data += 1;
-            }
-
-            // Save the URL
-            csvEntry->_url = data;
-
-            // Get the next line and csvEntry
-            data += strlen(data) + 1;
-            csvEntry += 1;
-        }
 
         // Sort the entries
         for (int i = HEADER_LINE_COUNT; i < (lineCount - 1); i++)
