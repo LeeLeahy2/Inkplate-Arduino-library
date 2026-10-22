@@ -108,7 +108,7 @@ bool networkReadCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
         csvTable = nullptr;
 
         // Start the network
-        networkStart(debugPrint);
+        networkStart();
 
         // Attempt to open the .CSV file
         if (networkServerConnectUsingUrl(csvFileUrl,
@@ -529,20 +529,18 @@ bool networkServerConnectUsingUrl(const char * url,
 //----------------------------------------
 // Start the network
 //----------------------------------------
-void networkStart(Print * debugPrint)
+void networkStart()
 {
     // Attempt to connect to the network
+    Serial.println("Starting WiFi network");
     while (display.connectWiFiMulti(WIFI_SSID_ENTRIES, ssid, password) == false)
     {
     }
 
     // Display the network connection
-    if (debugPrint)
-    {
-        debugPrint->print("Successfully connected to WiFi network ");
-        debugPrint->print(WiFi.SSID());
-        debugPrint->print(", ");
-        debugPrint->print(WiFi.STA.localIP().toString().c_str());
-        debugPrint->println("!");
-    }
+    Serial.print("Successfully connected to WiFi network ");
+    Serial.print(WiFi.SSID());
+    Serial.print(", ");
+    Serial.print(WiFi.STA.localIP().toString().c_str());
+    Serial.println("!");
 }
