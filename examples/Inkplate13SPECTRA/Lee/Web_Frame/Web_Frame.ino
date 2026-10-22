@@ -213,7 +213,15 @@ void setup()
     displayBatteryVoltageOverlay();
 
     // Display the image
+    uint32_t startMsec = millis();
     display.display();
+
+    // Display the time required to update the e-paper display
+    uint32_t milliseconds = millis() - startMsec;
+    uint32_t seconds = milliseconds / MILLISECONDS_IN_A_SECOND;
+    milliseconds -= seconds * MILLISECONDS_IN_A_SECOND;
+    Serial.printf("%d.%03d seconds to copy the frame buffer to e-paper\r\n",
+                  seconds, milliseconds);
 
     // Display the parameters
     Serial.printf("imageNumber: %d\r\n", imageNumber);
@@ -226,7 +234,7 @@ void setup()
                      * (uint32_t)(imagesBeforeCsvUpdate - (imageNumber % imagesBeforeCsvUpdate));
     uint32_t hours = minutes / 60;
     minutes -= hours * 60;
-    Serial.printf("Time before CVS update: %d:%02d\r\n", hours, minutes);
+    Serial.printf("Time before CVS update (h:mm): %d:%02d\r\n", hours, minutes);
 
     // Set the next image number
     imageNumber += 1;
@@ -400,17 +408,38 @@ void getBatteryVoltage()
 //----------------------------------------
 void reportFatalError(const char * errorMessage)
 {
+    uint32_t milliseconds;
+    uint32_t minutes;
+    uint32_t seconds;
+    uint32_t startMsec;
+
     // Display the error
     Serial.printf("%s\r\n", errorMessage);
 
     // Create the message in the frame buffer
+    startMsec = millis();
     display.clearDisplay();
     display.setTextSize(2);
     display.setTextColor(INKPLATE_BLACK);
     drawCenteredText(200, errorMessage);
 
+    // Display the time required to update the frame buffer
+    milliseconds = millis() - startMsec;
+    seconds = milliseconds / MILLISECONDS_IN_A_SECOND;
+    milliseconds -= seconds * MILLISECONDS_IN_A_SECOND;
+    Serial.printf("%d.%03d seconds to write the frame buffer\r\n",
+                  seconds, milliseconds);
+
     // Display the error message on the e-paper display
+    startMsec = millis();
     display.display();
+
+    // Display the time required to update the e-paper display
+    milliseconds = millis() - startMsec;
+    seconds = milliseconds / MILLISECONDS_IN_A_SECOND;
+    milliseconds -= seconds * MILLISECONDS_IN_A_SECOND;
+    Serial.printf("%d.%03d seconds to copy the frame buffer to e-paper\r\n",
+                  seconds, milliseconds);
 
     // Sleep
     deepSleep();
@@ -435,11 +464,15 @@ void reportHeapNow(bool includePsram)
 //----------------------------------------
 void requestUsbCable(const char * batteryVoltageString)
 {
+    uint32_t milliseconds;
+    uint32_t seconds;
+    uint32_t startMsec;
     int16_t x = 25;
     int16_t y = 0;
     int16_t vSpacing = 200;
 
     // Request USB cable
+    startMsec = millis();
     y += vSpacing;
     display.clearDisplay();     // Clear the frame buffer (does NOT clear the physical screen)
     display.setTextSize(20);    // Set text size (uint8_t, default is 1)
@@ -454,8 +487,23 @@ void requestUsbCable(const char * batteryVoltageString)
     display.setTextSize(18);    // Set text size (uint8_t, default is 1)
     drawCenteredText(y, batteryVoltageString);
 
+    // Display the time required to update the frame buffer
+    milliseconds = millis() - startMsec;
+    seconds = milliseconds / MILLISECONDS_IN_A_SECOND;
+    milliseconds -= seconds * MILLISECONDS_IN_A_SECOND;
+    Serial.printf("%d.%03d seconds to write the frame buffer\r\n",
+                  seconds, milliseconds);
+
     // Refresh the e-paper display to show changes
+    startMsec = millis();
     display.display();
+
+    // Display the time required to update the e-paper display
+    milliseconds = millis() - startMsec;
+    seconds = milliseconds / MILLISECONDS_IN_A_SECOND;
+    milliseconds -= seconds * MILLISECONDS_IN_A_SECOND;
+    Serial.printf("%d.%03d seconds to copy the frame buffer to e-paper\r\n",
+                  seconds, milliseconds);
 
     // Enter sleep mode
     deepSleep();

@@ -601,7 +601,16 @@ bool networkSelectImage(const CSV_ENTRY * csvTable, uint32_t lineCount)
 
         // Display the image
         Serial.printf("Selected URL: %s\r\n", url);
+        uint32_t startMsec = millis();
         success = networkDisplayUrl(url);
+        if (success)
+        {
+            uint32_t milliseconds = millis() - startMsec;
+            uint32_t seconds = milliseconds / MILLISECONDS_IN_A_SECOND;
+            milliseconds -= seconds * MILLISECONDS_IN_A_SECOND;
+            Serial.printf("%d.%03d seconds to write the frame buffer\r\n",
+                          seconds, milliseconds);
+        }
     } while (0);
     return success;
 }

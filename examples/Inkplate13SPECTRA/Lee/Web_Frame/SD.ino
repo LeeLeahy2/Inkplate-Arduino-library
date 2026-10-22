@@ -677,7 +677,16 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable, uint32_t lineCount)
 
     // Display the image
     Serial.printf("Selected file: SD:%s\r\n", filePath);
+    uint32_t startMsec = millis();
     success = sdCardDisplayFile(filePath);
+    if (success)
+    {
+        uint32_t milliseconds = millis() - startMsec;
+        uint32_t seconds = milliseconds / MILLISECONDS_IN_A_SECOND;
+        milliseconds -= seconds * MILLISECONDS_IN_A_SECOND;
+        Serial.printf("%d.%03d seconds to write the frame buffer\r\n",
+                      seconds, milliseconds);
+    }
     if (debugPrint)
         debugPrint->printf("sdCardSelectFile returning %d\r\n", success);
     return success;
