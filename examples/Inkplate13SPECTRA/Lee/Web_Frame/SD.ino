@@ -85,10 +85,6 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
             break;
         }
 
-        // Get the parameters
-        if (networkParseCsvFileParameters(csvTable, lineCount) == false)
-            break;
-
         // Walk the list of files
         fileNumber = 0;
         lineNumber = HEADER_LINE_COUNT;

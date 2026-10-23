@@ -15,24 +15,42 @@
 bool parameterSetValue(int parameter, const char * parameterValueString)
 {
     char errorMessage[80];
+    float fValue;
+    int iValue;
     const char * parameterName;
     int parameterType;
     bool success;
-    int value;
+    union
+    {
+        bool * b;
+        char * c;
+        double * d;
+        float * f;
+        int * i;
+        int8_t * i8;
+        int16_t * i16;
+        int32_t * i32;
+        int64_t * i64;
+        uint8_t * u8;
+        uint16_t * u16;
+        uint32_t * u32;
+        uint64_t * u64;
+        void * v;
+    } variable;
 
     // Get the numeric parameter value
     success = true;
     parameterName = csvParameterTable[parameter]._parameterName;
     parameterType = csvParameterTable[parameter]._parameterType;
+    variable.v = csvParameterTable[parameter]._parameterVariable;
     if ((parameterType != TYPE_STRING)
-        && (sscanf(parameterValueString, "0x%x", &value) != 1)
-        && (sscanf(parameterValueString, "%d", &value) != 1))
+        && (sscanf(parameterValueString, "0x%x", &iValue) != 1)
+        && (sscanf(parameterValueString, "%d", &iValue) != 1))
     {
         success = false;
         sprintf(errorMessage, "ERROR: Invalid value (%s) for parameter %s\r\n",
                 parameterValueString, parameterName);
         Serial.printf("%s\r\n", errorMessage);
-reportFatalError(errorMessage);
     }
 
     // Process the parameter
@@ -46,7 +64,17 @@ reportFatalError(errorMessage);
             break;
 
         case TYPE_BOOL:
-            *(bool *)csvParameterTable[parameter]._parameterVariable;
+            *variable.b = (bool)iValue;
+            break;
+
+        case TYPE_TENTHS:
+            fValue = iValue;
+            *variable.f = fValue / 10.;
+            break;
+
+        case TYPE_UINT16:
+            *variable.u16 = (uint16_t)iValue;
             break;
     }
+    return success;
 }

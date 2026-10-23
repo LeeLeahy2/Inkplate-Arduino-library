@@ -106,41 +106,19 @@ uint32_t networkCountCsvLines(char * csvData, size_t fileBytes)
     char * data;
     char * dataEnd;
     uint32_t lineCount;
-    char * lineStart;
 
-    // Separate and count the lines in the .csv file, skipping comment lines
+    // Count the lines in the .csv file, skipping comment lines
     lineCount = 0;
     data = csvData;
     dataEnd = &data[fileBytes];
-    lineStart = data;
     while (data < dataEnd)
     {
-        // Replace linefeeds with a NUL
-        if (*data == '\n')
-        {
-            // Zero-terminate the line
-            *data = 0;
-
-            // Count this line
-            if (*lineStart != COMMENT_CHARACTER)
-                lineCount += 1;
-
-            // Remember the start of the next line
-            lineStart = data + 1;
-        }
-        data += 1;
-    }
-
-    // Determine if the last line is terminated
-    data -= 1;
-    if (*data != 0)
-    {
-        // Zero-terminate the last line
-        *data = 0;
-
         // Count this line
-        if (*lineStart != COMMENT_CHARACTER)
+        if (*data != COMMENT_CHARACTER)
             lineCount += 1;
+
+        // Set the start of the next line
+        data += strlen(data) + 1;
     }
     return lineCount;
 }
@@ -312,81 +290,88 @@ String networkGetServerIpAddress(const char * server)
 //----------------------------------------
 // Get the parameters from the CSV file
 //----------------------------------------
-bool networkParseCsvFileParameters(const CSV_ENTRY * csvTable, uint32_t lineCount)
+char * networkParseCsvFileParameters(char * csvData, size_t fileBytes)
 {
-    const CSV_ENTRY * entry;
-    int temp;
-    uint16_t u16;
+    char * data;
+    char * dataEnd;
+    char errorMessage[80];
+    uint32_t lineNumber;
+    bool parameterFound[csvParameterTableEntries];
+    const char * parameterName;
+    uint32_t parameterNumber;
+    int parameterType;
+    char * parameterValue;
+    bool skipParameter;
+    int value;
 
-    //------------------------------------------------------
-    // The CSV file contains:
-    //
-    //  Line    Description
-    //    0     Display Minutes,Displayed Files Before CSV File Update
-    //    1     minutes,file count
-    //    2     SD_Card_File_Name,Network_Path
-    //    3     Debug enable=1 disable=0,Not Used
-    //    4     debuggingEnabled,reserved
-    //    5     file_1,url_1
-    //    6     file_2,url_3
-    //    n     ***
-    //------------------------------------------------------
+    // No parameters found yet
+    for (parameterNumber = 0; parameterNumber < csvParameterTableEntries; parameterNumber++)
+        parameterFound[parameterNumber] = false;
 
-    // Update the image display time
-    entry = &csvTable[1];
-    if (debugPrint)
-        debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
-    if (sscanf(entry->_filePath, "%d", &temp) != 1)
+    // Walk through the parameter area in the CSV file
+    data = csvData;
+    dataEnd = &data[fileBytes];
+    lineNumber = 1;
+    endOfParameters = false;
+    while (data < dataEnd)
     {
-        Serial.println("ERROR: Failed to update displayMinutes");
-        return false;
-    }
-    u16 = displayMinutes;
-    displayMinutes = (uint16_t)temp;
-    if (debugPrint)
-        debugPrint->printf("displayMinutes: %d --> %d\r\n", u16, displayMinutes);
+        char * nextLine;
 
-    // Update the CSV file polling interval
-    if (debugPrint)
-        debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
-    if (sscanf(entry->_url, "%d", &temp) != 1)
-    {
-        Serial.println("ERROR: Failed to update imagesBeforeCsvUpdate");
-        return false;
-    }
-    u16 = imagesBeforeCsvUpdate;
-    imagesBeforeCsvUpdate = (uint16_t)temp;
-    if (debugPrint)
-        debugPrint->printf("imagesBeforeCsvUpdate: %d --> %d\r\n", u16, imagesBeforeCsvUpdate);
+        // Skip over the comments
+        if (*data == COMMENT_CHARACTER)
+        {
+            data += strlen(data) + 1;
+            lineNumber += 1;
+            continue;
+        }
 
-    // Update debuggingEnabled
-    entry = &csvTable[3];
-    if (debugPrint)
-        debugPrint->printf("entry->_filePath: %s\r\n", entry->_filePath);
-    if (sscanf(entry->_filePath, "%d", &temp) != 1)
-    {
-        Serial.println("ERROR: Failed to update debuggingEnabled");
-        return false;
-    }
-    u16 = debuggingEnabled;
-    debuggingEnabled = (bool)temp;
-    debugPrint = debuggingEnabled ? &Serial : nullptr;
-    if (debuggingEnabled != u16)
-        Serial.printf("debuggingEnabled: %d --> %d\r\n", u16, debuggingEnabled);
+        // Separate the parameter name from the parameter value
+        parameterName = data;
+        parameterValue = data;
+        nextLine = &data[strlen(data) + 1];
+        while (*parameterValue != ',')
+            parameterValue += 1;
+        *parameterValue++ = 0;
 
-    // Update displayFiles
-    if (debugPrint)
-        debugPrint->printf("entry->_url: %s\r\n", entry->_url);
-    if (sscanf(entry->_url, "%d", &temp) != 1)
-    {
-        Serial.println("ERROR: Failed to update displayFiles");
-        return false;
+        // Attempt to locate the parameter
+        skipParameter = false;
+        for (parameterNumber = 0; parameterNumber < csvParameterTableEntries; parameterNumber++)
+        {
+            if (strcmp(parameterName, csvParameterTable[parameterNumber]._parameterName) == 0)
+                break;
+        }
+
+        // Display an error is the parameter was not found
+        if (parameterNumber >= csvParameterTableEntries)
+        {
+            sprintf(errorMessage, "Line %d, unknown parameter: %s", lineNumber, parameterName);
+            Serial.printf("%s\r\n", errorMessage);
+            reportFatalError(errorMessage);
+        }
+        // Set the value
+        else if (parameterSetValue(parameterNumber, parameterValue))
+            // Mark the parameter as found
+            parameterFound[parameterNumber] = true;
+
+        // Set the next line
+        data = nextLine;
+        if (endOfParameters)
+            break;
     }
-    u16 = displayFiles;
-    displayFiles = (bool)temp;
-    if (displayFiles != u16)
-        Serial.printf("displayFiles: %d --> %d\r\n", u16, displayFiles);
-    return true;
+
+    // Set the default values
+    for (parameterNumber = 0; parameterNumber < csvParameterTableEntries; parameterNumber++)
+    {
+        const char * defaultValue;
+        if (parameterFound[parameterNumber] == false)
+        {
+            defaultValue = csvParameterTable[parameterNumber]._parameterValue;
+            parameterSetValue(parameterNumber, defaultValue);
+        }
+    }
+
+    // Return the list of file names and URLs
+    return data;
 }
 
 //----------------------------------------
@@ -434,8 +419,10 @@ bool networkReadCsvFileFromStream(Stream * csvStream,
     CSV_ENTRY * csvTable;
     CSV_ENTRY * csvTemp;
     uint32_t lineCount;
+    size_t parameterBytes;
     size_t remainingBytes;
     bool success;
+    char * urlData;
 
     do
     {
@@ -465,18 +452,22 @@ bool networkReadCsvFileFromStream(Stream * csvStream,
         if (writeCsvFile && writeCsvFile(csvData, fileBytes) == false)
             break;
 
-        // Separate and count the lines in the .csv file, skipping comment lines
-        lineCount = networkCountCsvLines(csvData, fileBytes);
+        // Separate the lines in the .csv file
+        networkSeparateCsvLines(csvData, fileBytes);
 
-        // Check for an empty file
-        if (lineCount <= HEADER_LINE_COUNT)
-        {
-            Serial.println("ERROR: CSV file does not contain any images to display!");
-            break;
-        }
+        // Get the parameters from the CSV file
+        urlData = networkParseCsvFileParameters(csvData, fileBytes);
+        parameterBytes = urlData - csvData;
+        remainingBytes = fileBytes - parameterBytes;
+
+        // Count the lines in the .csv file, skipping comment lines
+        lineCount = networkCountCsvLines(urlData, remainingBytes);
 
         // Build the csvTable
-        if (networkBuildCsvTable(csvData, fileBytes, lineCount, &csvTable) == false)
+        if (networkBuildCsvTable(urlData,
+                                 remainingBytes,
+                                 lineCount,
+                                 &csvTable) == false)
             break;
 
         // Sort the entries
@@ -585,16 +576,8 @@ bool networkSelectImage(const CSV_ENTRY * csvTable, uint32_t lineCount)
             }
         }
 
-        // Get the parameters from the CSV file
-        success = networkParseCsvFileParameters(csvTable, lineCount);
-        if (success == false)
-            break;
-
         // Select a line in the file
-        lineNumber = imageNumber % (lineCount - HEADER_LINE_COUNT);
-
-        // Skip the header lines
-        lineNumber += HEADER_LINE_COUNT;
+        lineNumber %= lineCount;
 
         // Locate the URL
         url = csvTable[lineNumber]._url;
@@ -613,6 +596,35 @@ bool networkSelectImage(const CSV_ENTRY * csvTable, uint32_t lineCount)
         }
     } while (0);
     return success;
+}
+
+//----------------------------------------
+// Separate the lines in the CSV file
+//----------------------------------------
+void networkSeparateCsvLines(char * csvData, size_t fileBytes)
+{
+    char * data;
+    char * dataEnd;
+
+    // Separate and count the lines in the .csv file, skipping comment lines
+    data = csvData;
+    dataEnd = &data[fileBytes];
+    while (data < dataEnd)
+    {
+        // Replace linefeeds with a NUL
+        if (*data == '\n')
+            // Zero-terminate the line
+            *data = 0;
+        data += 1;
+    }
+
+    // Determine if the last line is terminated
+    data -= 1;
+    if (*data != 0)
+    {
+        // Zero-terminate the last line
+        *data = 0;
+    }
 }
 
 //----------------------------------------

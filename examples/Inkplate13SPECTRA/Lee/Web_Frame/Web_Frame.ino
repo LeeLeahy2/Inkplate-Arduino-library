@@ -246,7 +246,6 @@ void setup()
     if (displayMinutes == 0)
         for (int parameter = 0; parameter < csvParameterTableEntries; parameter++)
             parameterSetValue(parameter, csvParameterTable[parameter]._parameterValue);
-reportFatalError("All parameters loaded");
 
     // Select the debug serial output
     debugPrint = debuggingEnabled ? &Serial : nullptr;
