@@ -954,6 +954,15 @@ void r4aEsp32NvmMenuDisplayParameters(const struct _R4A_MENU_ENTRY * menuEntry,
 }
 
 //*********************************************************************
+// Display the partition table
+void r4aEsp32NvmMenuDisplayPartitionTable(const struct _R4A_MENU_ENTRY * menuEntry,
+                                          const char * command,
+                                          Print * display)
+{
+    r4aEsp32PartitionTableDisplay(display);
+}
+
+//*********************************************************************
 // Dump the parameter file
 void r4aEsp32NvmMenuDumpParameterFile(const struct _R4A_MENU_ENTRY * menuEntry,
                                       const char * command,
@@ -1940,6 +1949,15 @@ bool r4aEsp32NvmWriteParameters(const char * filePath,
 }
 
 //*********************************************************************
+// Reset the system
+void r4aEsp32MenuSystemReset(const struct _R4A_MENU_ENTRY * menuEntry,
+                             const char * command,
+                             Print * display)
+{
+    r4aEsp32SystemReset();
+}
+
+//*********************************************************************
 // Find the specified partition
 bool r4aEsp32PartitionFind(const char * name)
 {
@@ -2007,6 +2025,14 @@ void r4aEsp32PartitionTableDisplay(Print * display)
 
     // Display the table footer
     display->println("'-----------------------------------------------------'");
+}
+
+//*********************************************************************
+// System reset
+void r4aEsp32SystemReset()
+{
+    ESP.restart();
+    while (1);
 }
 
 //*********************************************************************

@@ -516,13 +516,46 @@ bool networkReadCsvFile(SD_CARD_WRITE_CSV_FILE writeCsvFile,
                         NETWORK_PROCESS_CSV_LINES processLines,
                         uint32_t timeout)
 {
+    int count;
     NetworkClient * csvStream;
     size_t fileBytes;
     HTTPClient https;
     bool success;
+    const char * wifiPass[WIFI_SSID_ENTRIES];
+    const char * wifiSsid[WIFI_SSID_ENTRIES];
+
+    // Remove empty entries
+    count = 0;
+    for (int i = 0; i < WIFI_SSID_ENTRIES; i++)
+    {
+        if ((ssid[i] != nullptr) && (ssid[i][0] != 0))
+        {
+            wifiSsid[count] = ssid[i];
+            wifiPass[count] = password[i];
+            count += 1;
+        }
+    }
+
+    // Verify that the CSV file is specified and that at least one WiFi
+    // access point SSID and password are specified
+    if ((csvFileUrl == nullptr) || (csvFileUrl[0] == 0))
+        Serial.printf("Enter csvFileUrl and then reboot\r\n");
+    if (count == 0)
+        Serial.printf("Enter WiFi SSID and password and then reboot\r\n");
+
+    // Wait for required NVM parameters
+    if ((count == 0)
+        || (csvFileUrl == nullptr) || (csvFileUrl[0] == 0))
+    {
+        Serial.printf("Waiting for parameter entry and reboot\r\n");
+        while ((count == 0)
+            || (csvFileUrl == nullptr) || (csvFileUrl[0] == 0))
+        {
+        }
+    }
 
     // Start the network
-    networkStart();
+    networkStart(count, wifiSsid, wifiPass);
 
     // Attempt to open the .CSV file
     success = networkServerConnectUsingUrl(csvFileUrl,
@@ -889,19 +922,11 @@ bool networkServerConnectUsingUrl(const char * url,
 //----------------------------------------
 // Start the network
 //----------------------------------------
-void networkStart()
+void networkStart(int count, const char ** wifiSsid, const char ** wifiPass)
 {
-    if (WIFI_SSID_ENTRIES != WIFI_PASSWORD_ENTRIES)
-    {
-        Serial.println("Fix WIFI_SSID_ENTRIES and WIFI_PASSWORD_ENTRIES");
-        Serial.println("Halting...");
-        while (1)
-            delay(1000);
-    }
-
     // Attempt to connect to the network
     Serial.println("Starting WiFi network");
-    while (display.connectWiFiMulti(WIFI_SSID_ENTRIES, ssid, password) == false)
+    while (display.connectWiFiMulti(count, wifiSsid, wifiPass) == false)
     {
     }
 

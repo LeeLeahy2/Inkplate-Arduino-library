@@ -373,3 +373,127 @@ bool r4aMenuProcess(R4A_MENU * menu,
         Serial.printf("_menu: %p\r\n", menu->_menu);
     return (menu->_menu == nullptr);
 }
+
+//*********************************************************************
+// Display data before the main menu header
+bool mainMenuPre(Print * display)
+{
+    display->printf("Battery Voltage: %s Volts\r\n", batteryVoltageString);
+    return true;
+}
+
+//*********************************************************************
+// Process serial menu item
+void r4aSerialMenu(R4A_MENU * menu)
+{
+    const char * command;
+    String * line;
+    static String serialBuffer;
+
+    // Process input from the serial port
+    line = r4aReadLine(true, &serialBuffer, &Serial);
+    if (line)
+    {
+        // Get the command
+        command = line->c_str();
+
+        // Process the command
+        if (!r4aMenuProcess(menu, command, &Serial))
+            // Display the menu
+            r4aMenuProcess(menu, nullptr, &Serial);
+
+        // Start building the next command
+        serialBuffer = "";
+    }
+}
+
+//*********************************************************************
+// Read a line of input from a Serial port into a String
+String * r4aReadLine(bool echo,
+                     String * buffer,
+                     Stream * input,
+                     Print * output)
+{
+    char data;
+    String * line;
+
+    // Wait for an input character
+    line = nullptr;
+    while (input->available())
+    {
+        // Get the input character
+        data = input->read();
+        if ((data != '\r') && (data != '\n'))
+        {
+            // Handle backspace
+            if (data == 8)
+            {
+                // Output a bell when the buffer is empty
+                if (buffer->length() <= 0)
+                    output->write(7);
+                else
+                {
+                    // Remove the character from the line
+                    output->write(data);
+                    output->write(' ');
+                    output->write(data);
+
+                    // Remove the character from the buffer
+                    *buffer = buffer->substring(0, buffer->length() - 1);
+                }
+            }
+            else
+            {
+                // Echo the character
+                if (echo)
+                    output->write(data);
+
+                // Add the character to the line
+                *buffer += data;
+            }
+        }
+
+        // Echo a carriage return and linefeed
+        else if (data == '\r')
+        {
+            if (echo)
+                output->println();
+            line = buffer;
+            break;
+        }
+
+        // Echo the linefeed
+        else if (echo && (data == '\n'))
+            output->println();
+    }
+
+    // Return the line when it is complete
+    return line;
+}
+
+//****************************************
+// Main menu
+//****************************************
+
+const R4A_MENU_ENTRY mainMenuTable[] =
+{
+    // Command  menuRoutine                     menuParam           HelpRoutine         align   HelpText
+    {"d",     r4aEsp32NvmMenuDisplayParameters, 0,                  nullptr,            0,      "Display NVM parameters"},              //  2
+    {"r",     r4aEsp32MenuSystemReset,          0,                  nullptr,            0,      "System reset"},
+    {"s",       r4aEsp32NvmMenuParameterSet, (intptr_t)"pppp ssss", r4aMenuHelpSuffix,  9,      "Set parameter pppp value to xxxx"},    // 12
+    {"t", r4aEsp32NvmMenuDisplayPartitionTable, 0,                  nullptr,            0,      "Display the partition table"},
+    {"x",       nullptr,                        R4A_MENU_NONE,      nullptr,            0,      "Exit the menu system"},                // 15
+    {"z",       r4aEsp32NvmMenuParameterClear,  (intptr_t)"pppp",   r4aMenuHelpSuffix,  4,      "Zero the parameter"},                  // 16
+};
+#define MAIN_MENU_ENTRIES       sizeof(mainMenuTable) / sizeof(mainMenuTable[0])
+
+//****************************************
+// List of menus
+//****************************************
+
+const R4A_MENU_TABLE menuTable[] =
+{
+    // menuName         preMenu routine firstEntry          entryCount
+    {"Main Menu",       mainMenuPre,    mainMenuTable,      MAIN_MENU_ENTRIES},
+};
+const int menuTableEntries = sizeof(menuTable) / sizeof(menuTable[0]);

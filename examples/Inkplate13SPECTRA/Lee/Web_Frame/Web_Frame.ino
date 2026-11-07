@@ -175,7 +175,6 @@ Print * debugPrint;
 Inkplate display;
 volatile bool endOfParameters;  // Indicates all parameter read from CSV file
 
-
 volatile RTC_DATA_ATTR uint32_t imageNumber;        // Image number to display
 RTC_DATA_ATTR float batteryVoltage;                 // Battery voltage
 
@@ -246,19 +245,24 @@ const int csvParameterTableEntries = sizeof(csvParameterTable) / sizeof(csvParam
 // 5)   Update Pictures.csv on the website
 
 //----------------------------------------
+// Serial menu support
+//----------------------------------------
+
+R4A_MENU serialMenu;
+volatile bool serialMenuRunning;
+
+//----------------------------------------
 // Starting point for the application
 //----------------------------------------
 void setup()
 {
+    BaseType_t status;
     bool success;
 
     Serial.begin(115200);
 
     // Display a sign-on message
     Serial.println("Web_Frame application");
-
-    // Display the partitions
-    r4aEsp32PartitionTableDisplay(&Serial);
 
     // Get the parameters
     r4aEsp32NvmGetParameters(&parameterFilePath);
@@ -278,6 +282,18 @@ void setup()
 
     // Select the debug serial output
     debugPrint = debuggingEnabled ? &Serial : nullptr;
+
+    // Start the core 0 task
+    status = xTaskCreatePinnedToCore(
+                  setupCore0,   // Function to implement the task
+                  "Core 0",     // Name of the task
+                  10000,        // Stack size in words
+                  NULL,         // Task input parameter
+                  0,            // Priority of the task
+                  nullptr,      // Task handle.
+                  0);           // Core where the task should run
+    if (status != pdPASS)
+        reportFatalError("Failed to create the core 0 task!");
 
     // Display an image from the SD card or the network
     success = sdCardDisplayImage(NETWORK_TIMEOUT);
@@ -347,6 +363,14 @@ void setup()
     // Set the next image number
     imageNumber += 1;
 
+    // Wait for the menu system to exit
+    if (serialMenuRunning)
+    {
+        Serial.printf("Waiting for menu system to exit!\r\n");
+        while (serialMenuRunning)
+            delay(100);
+    }
+
     // Activate wakeup timer
     esp_sleep_enable_timer_wakeup((uint64_t)displayMinutes * 60ull * 1000ull * 1000ull);
 
@@ -361,6 +385,36 @@ void loop()
 {
     // Never here! If you are using deep sleep, the whole program should be in setup() because the board restarts each
     // time. loop() must be empty!
+}
+
+//*********************************************************************
+// Setup for core 0
+void setupCore0(void *parameter)
+{
+    // Initialize the menus
+    r4aMenuBegin(&serialMenu, menuTable, menuTableEntries);
+//    serialMenu._debug = true;
+
+    //****************************************
+    // Execute loopCore0 forever
+    //****************************************
+
+    while (1)
+        loopCore0();
+}
+
+//*********************************************************************
+// Idle loop for core 0 the application
+void loopCore0()
+{
+    if (serialMenuRunning)
+    {
+        // Process serial commands
+        r4aSerialMenu(&serialMenu);
+        serialMenuRunning = (serialMenu._menu != nullptr);
+    }
+    else
+        serialMenuRunning = Serial.available() ? true : false;
 }
 
 //----------------------------------------

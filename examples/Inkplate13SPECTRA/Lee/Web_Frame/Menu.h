@@ -81,6 +81,10 @@ typedef struct _R4A_MENU
     bool _debug; // Set true to enable debugging
 } R4A_MENU;
 
+extern const R4A_MENU_ENTRY mainMenuTable[];
+extern const R4A_MENU_TABLE menuTable[];
+extern const int menuTableEntries;
+
 // Initialize the R4A_MENU data structure
 // Inputs:
 //   menu: Address of an R4A_MENU data structure
@@ -157,5 +161,22 @@ bool r4aMenuIsActive();
 bool r4aMenuProcess(R4A_MENU * menu,
                     const char * command,
                     Print * display = &Serial);
+
+//****************************************
+// ReadLine API
+//****************************************
+
+// Read a line of input from a serial port into a character array
+// Inputs:
+//   echo: Specify true to enable echo of input characters and false otherwise
+//   buffer: Address of a string that contains the input line
+//   input: Address of a Stream structure
+//   output: Address of a Print structure
+// Outputs:
+//   nullptr when the line is not complete
+String * r4aReadLine(bool echo,
+                     String * buffer,
+                     Stream * input = &Serial,
+                     Print * output = &Serial);
 
 #endif  // __MENU_H__

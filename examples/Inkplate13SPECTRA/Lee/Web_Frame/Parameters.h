@@ -41,7 +41,7 @@ const R4A_ESP32_NVM_PARAMETER nvmParameters[] =
     {true,  R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &parameterFilePath,         "ParamFile",    R4A_ESP32_NVM_STRING("/Parameters.txt")},
 
     // Web_Frame parameters
-    {true, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &csvFileUrl,                 "csvFileUrl",   R4A_ESP32_NVM_STRING("https://Your website/Your path/Your CSV file")},
+    {true, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &csvFileUrl,                 "csvFileUrl",   R4A_ESP32_NVM_STRING("")},
 
     // WiFi: Public Access Points (APs)
 // Required    Type                  Minimum     Maximum        Address                     Name            Default Value
