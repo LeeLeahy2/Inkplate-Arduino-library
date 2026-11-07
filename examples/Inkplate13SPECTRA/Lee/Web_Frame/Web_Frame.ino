@@ -53,7 +53,7 @@
 #include "Inkplate.h"
 #include "Menu.h"
 #include "NVM.h"
-#include "secrets.h"
+#include "Parameters.h"
 
 #define r4aDumpBuffer(offset, buffer, length, display)  dumpBuffer(offset, buffer, length, display)
 
@@ -256,6 +256,12 @@ void setup()
 
     // Display a sign-on message
     Serial.println("Web_Frame application");
+
+    // Display the partitions
+    r4aEsp32PartitionTableDisplay(&Serial);
+
+    // Get the parameters
+    r4aEsp32NvmGetParameters(&parameterFilePath);
 
     // Initialize the display
     display.begin();
