@@ -48,19 +48,8 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
     csvTable = csvContext->_csvTable;
     lineCount = csvContext->_lineCount;
 
-    if (displayFiles)
+    if (displaySdCardFiles)
     {
-        // List the files in the CSV file
-        Serial.println("----------------------------------------");
-        Serial.println("CSV Data");
-        Serial.println("----------------------------------------");
-        Serial.printf("lineCount: %d\r\n", lineCount);
-        for (int i = 0; i < lineCount; i++)
-        {
-            entry = &csvTable[i];
-            Serial.printf("%s,   %s\r\n", entry->_filePath, entry->_url);
-        }
-
         Serial.println("----------------------------------------");
         Serial.println("SD Card Files");
         Serial.println("----------------------------------------");
@@ -87,7 +76,7 @@ bool sdCardCompareFiles(const FILE_INFO ** fileTable,
 
         // Walk the list of files
         fileNumber = 0;
-        lineNumber = HEADER_LINE_COUNT;
+        lineNumber = 0;
         entry = &csvTable[lineNumber];
         fileInfo = fileCount ? fileTable[fileNumber] : nullptr;
         Serial.println("Verifying files are on SD card");
@@ -385,7 +374,8 @@ bool sdCardDisplayFile(const char * filePath)
     bool success;
 
     // Display the file path
-    Serial.printf("Opening SD:%s\r\n", filePath);
+    if (debugPrint)
+        debugPrint->printf("Opening SD:%s\r\n", filePath);
 
     // Open the file
     success = false;
@@ -401,19 +391,22 @@ bool sdCardDisplayFile(const char * filePath)
         // Select routine based upon the image extension
         if (strcmp(extension, ".bmp") == 0)
         {
-            Serial.println("Loading .BMP image");
+            if (debugPrint)
+                debugPrint->println("Loading .BMP image");
             success = display.image.drawBitmapFromSd(&file, 0, 0, false, false);
         }
         else if ((strcmp(extension, ".jpg") == 0) || (strcmp(extension, ".jpeg") == 0))
         {
             // Download and draw the JPEG image directly from the web
             // Function returns 1 on success and 0 on failure
-            Serial.println("Loading .JPG image");
+            if (debugPrint)
+                debugPrint->println("Loading .JPG image");
             success = display.image.drawJpegFromSd(&file, 0, 0, false, false);
         }
         else if (strcmp(extension, ".png") == 0)
         {
-            Serial.println("Loading .PNG image");
+            if (debugPrint)
+                debugPrint->println("Loading .PNG image");
             success = display.image.drawPngFromSd(&file, 0, 0, false, false);
         }
 
@@ -648,31 +641,14 @@ bool sdCardSelectFile(const CSV_ENTRY * csvTable, uint32_t lineCount)
     uint32_t lineNumber;
     bool success;
 
-    if (displayFiles)
-    {
-        // List the files in the CSV file
-        Serial.println("----------------------------------------");
-        Serial.println("CSV Data");
-        Serial.println("----------------------------------------");
-        Serial.printf("lineCount: %d\r\n", lineCount);
-        for (int i = 0; i < lineCount; i++)
-        {
-            entry = &csvTable[i];
-            Serial.printf("%s,   %s\r\n", entry->_filePath, entry->_url);
-        }
-    }
-
     // Select a line in the file
-    lineNumber = imageNumber % (lineCount - HEADER_LINE_COUNT);
-
-    // Skip the header line
-    lineNumber += HEADER_LINE_COUNT;
+    lineNumber = selectImage(lineCount);
 
     // Locate the file path
     filePath = csvTable[lineNumber]._filePath;
 
     // Display the image
-    Serial.printf("Selected file: SD:%s\r\n", filePath);
+    Serial.printf("Selected file: %d) SD:%s\r\n", lineNumber, filePath);
     uint32_t startMsec = millis();
     success = sdCardDisplayFile(filePath);
     if (success)

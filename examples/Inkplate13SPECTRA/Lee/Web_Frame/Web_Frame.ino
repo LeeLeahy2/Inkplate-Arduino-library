@@ -172,14 +172,18 @@ volatile RTC_DATA_ATTR uint16_t imagesBeforeCsvUpdate;  // Time between CSV file
 volatile RTC_DATA_ATTR bool debuggingEnabled;       // Enable or disable debugging output
 volatile RTC_DATA_ATTR bool displayFiles;           // Display files when true
 volatile RTC_DATA_ATTR bool overlayBatteryVoltage;  // Display battery voltage overlay
+volatile RTC_DATA_ATTR bool displayCsvFile;
+volatile RTC_DATA_ATTR bool displayParameters;
+volatile RTC_DATA_ATTR bool displayRawUrls;
+volatile RTC_DATA_ATTR bool displaySdCardFiles;
+volatile RTC_DATA_ATTR bool displaySortedUrls;
+volatile RTC_DATA_ATTR bool displayUnsortedUrls;
 
 //----------------------------------------
 // Constants
 //----------------------------------------
 
 #define CHARGE_VOLTAGE                  3.6
-
-#define HEADER_LINE_COUNT               5
 
 #define MICROSECONDS_IN_A_MILLISECOND   1000ull
 #define MILLISECONDS_IN_A_SECOND        1000ull
@@ -203,12 +207,18 @@ const CSV_PARAMETER_ENTRY csvParameterTable[] =
 {
     //      Name                       Type        Value              Variable
     {"batteryVoltageInTenths",      TYPE_TENTHS,    "36",   (void *)&batteryVoltage},
-    {"debugEnable",                 TYPE_BOOL,      "1",    (void *)&debuggingEnabled},
-    {"overlayBatteryVoltage",       TYPE_BOOL,      "1",    (void *)&overlayBatteryVoltage},
-    {"displayCsvAndSdCardFiles",    TYPE_BOOL,      "1",    (void *)&displayFiles},
-    {"displayMinutes",              TYPE_UINT16,    "1",    (void *)&displayMinutes},
+    {"debugEnable",                 TYPE_BOOL,      "0",    (void *)&debuggingEnabled},
+    {"overlayBatteryVoltage",       TYPE_BOOL,      "0",    (void *)&overlayBatteryVoltage},
+    {"displayCsvFile",              TYPE_BOOL,      "0",    (void *)&displayCsvFile},
+    {"displayCsvAndSdCardFiles",    TYPE_BOOL,      "0",    (void *)&displayFiles},
+    {"displayMinutes",              TYPE_UINT16,    "15",   (void *)&displayMinutes},
+    {"displayParameters",           TYPE_BOOL,      "0",    (void *)&displayParameters},
+    {"displayRawUrls",              TYPE_BOOL,      "0",    (void *)&displayRawUrls},
+    {"displaySdCardFiles",          TYPE_BOOL,      "0",    (void *)&displaySdCardFiles},
+    {"displaySortedUrls",           TYPE_BOOL,      "0",    (void *)&displaySortedUrls},
+    {"displayUnsortedUrls",         TYPE_BOOL,      "0",    (void *)&displayUnsortedUrls},
     {"endOfParameters",             TYPE_BOOL,      "0",    (void *)&endOfParameters},
-    {"imagesBeforeCsvUpdate",       TYPE_UINT16,    "2",    (void *)&imagesBeforeCsvUpdate},
+    {"imagesBeforeCsvUpdate",       TYPE_UINT16,    "4",    (void *)&imagesBeforeCsvUpdate},
 };
 const int csvParameterTableEntries = sizeof(csvParameterTable) / sizeof(csvParameterTable[0]);
 
@@ -276,11 +286,37 @@ void setup()
     Serial.printf("%d.%03d seconds to copy the frame buffer to e-paper\r\n",
                   seconds, milliseconds);
 
+    // Sort the parameters
+    uint16_t sortTable[csvParameterTableEntries];
+    for (int i = 0; i < csvParameterTableEntries; i++)
+        sortTable[i] = i;
+    for (int i = 0; i < (csvParameterTableEntries - 1); i++)
+    {
+        for (int j = i + 1; j < csvParameterTableEntries; j++)
+        {
+            if (strcmp(csvParameterTable[sortTable[i]]._parameterName, csvParameterTable[sortTable[j]]._parameterName) > 0)
+            {
+                uint32_t temp = i;
+                i = j;
+                j = temp;
+            }
+        }
+    }
+
     // Display the parameters
-    Serial.printf("imageNumber: %d\r\n", imageNumber);
-    Serial.printf("displayMinutes: %d\r\n", displayMinutes);
-    Serial.printf("imagesBeforeCsvUpdate: %d\r\n", imagesBeforeCsvUpdate);
-    Serial.printf("displayFiles: %d\r\n", displayFiles);
+    if (displayParameters)
+    {
+        for (int i = 0; i < csvParameterTableEntries; i++)
+        {
+            const CSV_PARAMETER_ENTRY * entry = &csvParameterTable[sortTable[i]];
+            if (entry->_parameterType == TYPE_BOOL)
+                Serial.printf("%s: %d\r\n", entry->_parameterName, *(bool *)entry->_parameterVariable);
+            else if (entry->_parameterType == TYPE_TENTHS)
+                Serial.printf("%s: %f4.2\r\n", entry->_parameterName, *(float *)entry->_parameterVariable);
+            else if (entry->_parameterType == TYPE_UINT16)
+                Serial.printf("%s: %f4.2\r\n", entry->_parameterName, *(uint16_t *)entry->_parameterVariable);
+        }
+    }
 
     // Display the time to next CSV update
     uint32_t minutes = (uint32_t)displayMinutes

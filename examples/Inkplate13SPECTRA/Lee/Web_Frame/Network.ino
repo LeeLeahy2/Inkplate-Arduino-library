@@ -11,6 +11,148 @@
  **************************************************/
 
 //----------------------------------------
+// Display the CSV table
+//----------------------------------------
+void displayCsvTable(const CSV_ENTRY * csvTable, uint32_t lineCount)
+{
+    const CSV_ENTRY * entry;
+    const char * line = "Line";
+    const char * name = "File Path";
+    const char * url = "URL";
+    int width;
+    int widthLine;
+    int widthName;
+    int widthUrl;
+    int x;
+    int y;
+
+    // Determine the column widths
+    entry = csvTable;
+    widthLine = strlen(line);
+    widthName = strlen(name);
+    widthUrl = strlen(url);
+    for (int i = 0; i < lineCount; i++)
+    {
+        // Determine the file path width
+        entry = &csvTable[i];
+        width = strlen(entry->_filePath);
+        if (width > widthName)
+            widthName = width;
+
+        // Determine the url width
+        width = strlen(entry->_url);
+        if (width > widthUrl)
+        widthUrl = width;
+    }
+
+    // Display the CSV table top header line
+    displayCsvTableHeaderLine(widthLine, widthName, widthUrl, '.');
+
+    // Display the line column header
+    Serial.printf("|%s|", line);
+
+    // Display the filePath column header
+    y = widthName - strlen(name);
+    x = y / 2;
+    for (int i = 0; i < x; i++)
+        Serial.write(' ');
+    Serial.print(name);
+    x = y - x;
+    for (int i = 0; i < x; i++)
+        Serial.write(' ');
+    Serial.write('|');
+
+    // Display the URL column header
+    y = widthUrl - strlen(url);
+    x = y / 2;
+    for (int i = 0; i < x; i++)
+        Serial.write(' ');
+    Serial.print(url);
+    x = y - x;
+    for (int i = 0; i < x; i++)
+        Serial.write(' ');
+    Serial.write('|');
+    Serial.print("\r\n");
+
+    // Display the CSV table bottom header line
+    displayCsvTableHeaderLine(widthLine, widthName, widthUrl, '|');
+
+    // Display the CSV table entries
+    entry = csvTable;
+    for (int i = 0; i < lineCount; i++)
+    {
+        Serial.write('|');
+
+        // Display the line number
+        y = widthLine - 2;
+        x = y / 2;
+        for (int i = 0; i < x; i++)
+            Serial.write(' ');
+        Serial.printf("%2d", i);
+        x = y - x;
+        for (int i = 0; i < x; i++)
+            Serial.write(' ');
+        Serial.write('|');
+
+        // Display the filePath
+        y = widthName - strlen(csvTable[i]._filePath);
+        Serial.printf(csvTable[i]._filePath);
+        for (int i = 0; i < y; i++)
+            Serial.write(' ');
+        Serial.write('|');
+
+        // Display the URL
+        y = widthUrl - strlen(csvTable[i]._url);
+        Serial.printf(csvTable[i]._url);
+        for (int i = 0; i < y; i++)
+            Serial.write(' ');
+        Serial.write('|');
+
+        // Done with this line
+        Serial.print("\r\n");
+    }
+
+    // Display the CSV table bottom line
+    displayCsvTableHeaderLine(widthLine, widthName, widthUrl, '\'');
+}
+
+//----------------------------------------
+// Display a CSV header line
+//----------------------------------------
+void displayCsvTableHeaderLine(int widthLine,
+                               int widthName,
+                               int widthUrl,
+                               char separator)
+{
+    // Display a separator line
+    Serial.write(separator);
+    for (int j = 0; j < widthLine; j++)
+        Serial.write('-');
+    Serial.write(separator);
+    for (int j = 0; j < widthName; j++)
+        Serial.write('-');
+    Serial.write(separator);
+    for (int j = 0; j < widthUrl; j++)
+        Serial.write('-');
+    Serial.write(separator);
+    Serial.println();
+}
+
+//----------------------------------------
+// Display the lines
+//----------------------------------------
+void displayLines(const char * data, size_t bytes, uint32_t lineNumber)
+{
+    const char * dataEnd;
+
+    dataEnd = &data[bytes];
+    while (data < dataEnd)
+    {
+        Serial.printf("%2d) %s\r\n", lineNumber++, data);
+        data += strlen(data) + 1;
+    }
+}
+
 // Build the csvTable
 //----------------------------------------
 bool networkBuildCsvTable(char * csvData,
@@ -26,13 +168,6 @@ bool networkBuildCsvTable(char * csvData,
     do
     {
         success = false;
-
-        // Check for an empty file
-        if (lineCount <= HEADER_LINE_COUNT)
-        {
-            Serial.println("ERROR: CSV file does not contain any images to display!");
-            break;
-        }
 
         // Allocate the CSV table
         *csvTable = (CSV_ENTRY *)malloc(lineCount * sizeof(CSV_ENTRY));
@@ -455,10 +590,28 @@ bool networkReadCsvFileFromStream(Stream * csvStream,
         // Separate the lines in the .csv file
         networkSeparateCsvLines(csvData, fileBytes);
 
+        // Display the contents of the CSV file
+        if (displayCsvFile)
+        {
+            Serial.println("------------------------------------------------");
+            Serial.println("CSV file");
+            Serial.println("------------------------------------------------");
+            displayLines(csvData, fileBytes, 1);
+        }
+
         // Get the parameters from the CSV file
         urlData = networkParseCsvFileParameters(csvData, fileBytes);
         parameterBytes = urlData - csvData;
         remainingBytes = fileBytes - parameterBytes;
+
+        // Display the remaining data lines
+        if (displayRawUrls)
+        {
+            Serial.println("------------------------------------------------");
+            Serial.println("File path and URL data from CSV file");
+            Serial.println("------------------------------------------------");
+            displayLines(urlData, remainingBytes, 0);
+        }
 
         // Count the lines in the .csv file, skipping comment lines
         lineCount = networkCountCsvLines(urlData, remainingBytes);
@@ -470,8 +623,12 @@ bool networkReadCsvFileFromStream(Stream * csvStream,
                                  &csvTable) == false)
             break;
 
+        // Display the CSV table
+        if (displayUnsortedUrls)
+            displayCsvTable(csvTable, lineCount);
+
         // Sort the entries
-        for (int i = HEADER_LINE_COUNT; i < (lineCount - 1); i++)
+        for (int i = 0; i < (lineCount - 1); i++)
         {
             for (int j = i + 1; j < lineCount; j++)
             {
@@ -490,6 +647,10 @@ bool networkReadCsvFileFromStream(Stream * csvStream,
                 }
             }
         }
+
+        // Display the CSV table
+        if (displaySortedUrls)
+            displayCsvTable(csvTable, lineCount);
 
         // Process the CSV file
         if (processLines)
@@ -562,28 +723,14 @@ bool networkSelectImage(const CSV_ENTRY * csvTable, uint32_t lineCount)
     {
         success = false;
 
-        if (displayFiles)
-        {
-            // List the files in the CSV file
-            Serial.println("----------------------------------------");
-            Serial.println("CSV Data");
-            Serial.println("----------------------------------------");
-            Serial.printf("lineCount: %d\r\n", lineCount);
-            for (int i = 0; i < lineCount; i++)
-            {
-                entry = &csvTable[i];
-                Serial.printf("%s,   %s\r\n", entry->_filePath, entry->_url);
-            }
-        }
-
         // Select a line in the file
-        lineNumber %= lineCount;
+        lineNumber = selectImage(lineCount);
 
         // Locate the URL
         url = csvTable[lineNumber]._url;
 
         // Display the image
-        Serial.printf("Selected URL: %s\r\n", url);
+        Serial.printf("Selected URL: %d) Net:%s\r\n", lineNumber, url);
         uint32_t startMsec = millis();
         success = networkDisplayUrl(url);
         if (success)
@@ -764,4 +911,13 @@ void networkStart()
     Serial.print(", ");
     Serial.print(WiFi.STA.localIP().toString().c_str());
     Serial.println("!");
+}
+
+//----------------------------------------
+// Select the image
+//----------------------------------------
+uint32_t selectImage(uint32_t lineCount)
+{
+    // Select a line in the file
+    return imageNumber % lineCount;
 }
