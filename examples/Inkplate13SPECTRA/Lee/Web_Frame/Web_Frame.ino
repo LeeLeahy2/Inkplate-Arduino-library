@@ -38,6 +38,7 @@
 #endif
 
 #include <arpa/inet.h>
+#include <LittleFS.h>           // Built-in, load and store files in flash
 #include <HTTPClient.h>
 #include <netdb.h>
 #include <Network.h>
@@ -51,11 +52,17 @@
 #include "Atomic.h"
 #include "Inkplate.h"
 #include "Menu.h"
+#include "NVM.h"
 #include "secrets.h"
+
+#define r4aDumpBuffer(offset, buffer, length, display)  dumpBuffer(offset, buffer, length, display)
 
 #define r4aReportFatalError         reportFatalError
 #define r4aStricmp                  strcasecmp
 #define r4aStrincmp                 strncasecmp
+
+#define r4aMalloc(bytes, description)   malloc(bytes)
+#define r4aFree(addr, description)      free(addr)
 
 //----------------------------------------
 // Type declarations
@@ -422,7 +429,7 @@ void drawCenteredText(int16_t y, const char * text)
 //----------------------------------------
 // Dump a buffer in hex and ASCII
 //----------------------------------------
-void dumpBuffer(size_t offset, const uint8_t *buffer, size_t length)
+void dumpBuffer(size_t offset, const uint8_t *buffer, size_t length, Print * display = &Serial)
 {
     int bytes;
     const uint8_t *end;
@@ -437,29 +444,29 @@ void dumpBuffer(size_t offset, const uint8_t *buffer, size_t length)
             bytes = 16 - (offset & 0xf);
 
         // Display the offset
-        Serial.printf("0x%08lx: ", offset);
+        display->printf("0x%08lx: ", offset);
 
         // Skip leading bytes
         for (index = 0; index < (offset & 0xf); index++)
-            Serial.printf("   ");
+            display->printf("   ");
 
         // Display the data bytes
         for (index = 0; index < bytes; index++)
-            Serial.printf("%02X ", buffer[index]);
+            display->printf("%02X ", buffer[index]);
 
         // Separate the data bytes from the ASCII
         for (; index < (16 - (offset & 0xf)); index++)
-            Serial.printf("   ");
-        Serial.printf(" ");
+            display->printf("   ");
+        display->printf(" ");
 
         // Skip leading bytes
         for (index = 0; index < (offset & 0xf); index++)
-            Serial.printf(" ");
+            display->printf(" ");
 
         // Display the ASCII values
         for (index = 0; index < bytes; index++)
-            Serial.printf("%c", ((buffer[index] < ' ') || (buffer[index] >= 0x7f)) ? '.' : buffer[index]);
-        Serial.printf("\r\n");
+            display->printf("%c", ((buffer[index] < ' ') || (buffer[index] >= 0x7f)) ? '.' : buffer[index]);
+        display->printf("\r\n");
 
         // Set the next line of data
         buffer += bytes;
