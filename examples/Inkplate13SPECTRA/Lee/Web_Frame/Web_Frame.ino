@@ -48,8 +48,14 @@
 #include <WiFiClientSecure.h>
 #include <WiFiMulti.h>
 
+#include "Atomic.h"
 #include "Inkplate.h"
+#include "Menu.h"
 #include "secrets.h"
+
+#define r4aReportFatalError         reportFatalError
+#define r4aStricmp                  strcasecmp
+#define r4aStrincmp                 strncasecmp
 
 //----------------------------------------
 // Type declarations
