@@ -808,17 +808,20 @@ bool r4aEsp32NvmGetParameters(const char ** filePath,
                               Print * display,
                               bool debug)
 {
+    const char * partitionName = "spiffs";
+    bool success;
+
     do
     {
         // Get the default parameters
         r4aEsp32NvmGetDefaultParameters(nvmParameters, nvmParameterCount);
 
         // Verify that the spiffs partition exists
-        if (!r4aEsp32PartitionFind("spiffs"))
+        if (!r4aEsp32PartitionFind(partitionName))
         {
             r4aEsp32PartitionTableDisplay(&Serial);
             if (display)
-                display->println("ERROR: Add missing spiffs partition!");
+                display->printf("ERROR: Add missing %s partition!\r\n", partitionName);
             break;
         }
 
@@ -831,7 +834,14 @@ bool r4aEsp32NvmGetParameters(const char ** filePath,
 
         // Start the file system
         log_v("Starting the little file system");
-        if (!LittleFS.begin(true)) // Format LittleFS upon failure
+        success = LittleFS.begin(true); // Format LittleFS upon failure
+        if (success == false)
+        {
+            success = LittleFS.begin(false);
+            if (success)
+                Serial.printf("LittleFS total bytes: %d\r\n", LittleFS.totalBytes());
+        }
+        if (success == false)
         {
             if (display)
                  display->println("Warning: LittleFS not available, using default parameters");
@@ -1984,7 +1994,7 @@ bool r4aEsp32PartitionFind(const char * name)
         } while ((pi = (esp_partition_next(pi))));
     }
 
-    // The spiffs partition does not exist
+    // The partition does not exist
     return false;
 }
 
