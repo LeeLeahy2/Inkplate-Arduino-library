@@ -364,12 +364,7 @@ void setup()
     imageNumber += 1;
 
     // Wait for the menu system to exit
-    if (serialMenuRunning)
-    {
-        Serial.printf("Waiting for menu system to exit!\r\n");
-        while (serialMenuRunning)
-            delay(100);
-    }
+    menuWaitExit();
 
     // Activate wakeup timer
     esp_sleep_enable_timer_wakeup((uint64_t)displayMinutes * 60ull * 1000ull * 1000ull);

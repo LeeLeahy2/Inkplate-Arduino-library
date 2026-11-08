@@ -471,6 +471,18 @@ String * r4aReadLine(bool echo,
     return line;
 }
 
+//*********************************************************************
+// Wait for the menu system to exit
+void menuWaitExit()
+{
+    if (serialMenuRunning)
+    {
+        Serial.printf("Waiting for menu system to exit!\r\n");
+        while (serialMenuRunning)
+            delay(100);
+    }
+}
+
 //****************************************
 // Main menu
 //****************************************
