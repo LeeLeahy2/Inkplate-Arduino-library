@@ -41,26 +41,27 @@ const R4A_ESP32_NVM_PARAMETER nvmParameters[] =
     {true,  R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &parameterFilePath,         "ParamFile",    R4A_ESP32_NVM_STRING("/Parameters.txt")},
 
     // Web_Frame parameters
-    {true, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &csvFileUrl,                 "csvFileUrl",   R4A_ESP32_NVM_STRING("")},
+// Required    Type                  Minimum     Maximum        Address                     Name            Default Value
+    {true, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,              &csvFileUrl,                "csvFileUrl",   0},
 
     // WiFi: Public Access Points (APs)
 // Required    Type                  Minimum     Maximum        Address                     Name            Default Value
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[0],                 "WifiSsid1",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[0],             "WifiPass1",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[1],                 "WifiSsid2",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[1],             "WifiPass2",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[2],                 "WifiSsid3",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[2],             "WifiPass3",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[3],                 "WifiSsid4",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[3],             "WifiPass4",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[4],                 "WifiSsid5",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[4],             "WifiPass5",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[5],                 "WifiSsid6",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[5],             "WifiPass6",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[6],                 "WifiSsid7",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[6],             "WifiPass7",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[7],                 "WifiSsid8",    R4A_ESP32_NVM_STRING("")},
-    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[7],             "WifiPass8",    R4A_ESP32_NVM_STRING("")},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[0],                   "WifiSsid1",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[0],               "WifiPass1",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[1],                   "WifiSsid2",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[1],               "WifiPass2",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[2],                   "WifiSsid3",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[2],               "WifiPass3",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[3],                   "WifiSsid4",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[3],               "WifiPass4",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[4],                   "WifiSsid5",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[4],               "WifiPass5",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[5],                   "WifiSsid6",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[5],               "WifiPass6",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[6],                   "WifiSsid7",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[6],               "WifiPass7",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &ssid[7],                   "WifiSsid8",    0},
+    {false, R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &password[7],               "WifiPass8",    0},
 };
 const int nvmParameterCount = sizeof(nvmParameters) / sizeof(nvmParameters[0]);
 
