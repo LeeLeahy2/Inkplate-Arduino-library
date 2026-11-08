@@ -618,7 +618,8 @@ bool sdCardReadPicturesCsvFile(NETWORK_PROCESS_CSV_LINES processLines,
 
         // Read the CSV file
         SdFatStream fileStream = SdFatStream(&csvFile);
-        success = networkReadCsvFileFromStream((Stream *)&fileStream,
+        success = networkReadCsvFileFromStream("SD Card",
+                                               (Stream *)&fileStream,
                                                fileBytes,
                                                nullptr,
                                                processLines,

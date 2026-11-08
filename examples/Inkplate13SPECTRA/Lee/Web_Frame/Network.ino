@@ -564,7 +564,8 @@ bool networkReadCsvFile(SD_CARD_WRITE_CSV_FILE writeCsvFile,
                                            fileBytes);
     if (success)
         // Read and process the CSV file
-        success = networkReadCsvFileFromStream(csvStream,
+        success = networkReadCsvFileFromStream("network",
+                                               csvStream,
                                                fileBytes,
                                                writeCsvFile,
                                                processLines,
@@ -576,7 +577,8 @@ bool networkReadCsvFile(SD_CARD_WRITE_CSV_FILE writeCsvFile,
 //----------------------------------------
 // Read the CSV file from a stream
 //----------------------------------------
-bool networkReadCsvFileFromStream(Stream * csvStream,
+bool networkReadCsvFileFromStream(const char * device,
+                                  Stream * csvStream,
                                   size_t fileBytes,
                                   SD_CARD_WRITE_CSV_FILE writeCsvFile,
                                   NETWORK_PROCESS_CSV_LINES processLines,
@@ -610,6 +612,7 @@ bool networkReadCsvFileFromStream(Stream * csvStream,
         csvData[fileBytes] = 0;
 
         // Read the .CSV file
+        Serial.printf("Reading CSV file from %s\r\n", device);
         if (networkReadCsvFileIntoDataBuffer(csvStream,
                                              csvData,
                                              fileBytes,
@@ -707,7 +710,6 @@ bool networkReadCsvFileIntoDataBuffer(Stream * csvStream,
                                       uint32_t timeout)
 {
     // Read the .CSV file
-    Serial.println("Reading CSV file from network");
     char * data = csvData;
     char * dataEnd = &data[fileBytes];
     uint32_t timerStart = millis();
