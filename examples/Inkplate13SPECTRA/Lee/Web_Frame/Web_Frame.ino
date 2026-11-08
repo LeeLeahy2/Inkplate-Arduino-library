@@ -45,6 +45,7 @@
 #include <NetworkClientSecure.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <Update.h>             //Built-in
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WiFiMulti.h>
@@ -191,6 +192,8 @@ volatile RTC_DATA_ATTR bool displaySdCardFiles;
 volatile RTC_DATA_ATTR bool displaySortedUrls;
 volatile RTC_DATA_ATTR bool displayUnsortedUrls;
 
+volatile RTC_DATA_ATTR bool firmwareUpdateSkip; // Skip firmware updates when true
+
 //----------------------------------------
 // Constants
 //----------------------------------------
@@ -262,10 +265,13 @@ void setup()
     Serial.begin(115200);
 
     // Display a sign-on message
-    Serial.println("Web_Frame application");
+    Serial.println("Web_Frame");
 
     // Get the parameters
     r4aEsp32NvmGetParameters(&parameterFilePath);
+
+    // Display the firmware version
+    Serial.printf("v%d.%02d\r\n", firmwareVersionMajor, firmwareVersionMinor);
 
     // Initialize the display
     display.begin();

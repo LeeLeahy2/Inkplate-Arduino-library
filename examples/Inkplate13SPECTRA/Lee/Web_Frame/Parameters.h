@@ -14,10 +14,21 @@
 const char * parameterFilePath;
 
 //****************************************
+// OTA
+//****************************************
+
+bool otaDebug;
+bool otaDebugVerbose;
+uint8_t firmwareVersionMajor;
+uint8_t firmwareVersionMinor;
+
+
+//****************************************
 // Web_Frame
 //****************************************
 
 const char * csvFileUrl;
+const char * firmwareUrl;
 
 //****************************************
 // WiFi Access Points
@@ -39,6 +50,14 @@ const R4A_ESP32_NVM_PARAMETER nvmParameters[] =
     // NVM parameters
 // Required    Type                  Minimum     Maximum        Address                     Name            Default Value
     {true,  R4A_ESP32_NVM_PT_P_CHAR, 0,          0,             &parameterFilePath,         "ParamFile",    R4A_ESP32_NVM_STRING("/Parameters.txt")},
+
+    // OTA parameters
+// Required    Type                  Minimum     Maximum        Address                     Name            Default Value
+    {true, R4A_ESP32_NVM_PT_P_CHAR,  0,          0,             &firmwareUrl,               "firmwareUrl",  0},
+    {true, R4A_ESP32_NVM_PT_UINT8,   0,          255,           &firmwareVersionMajor,      "MajorVer",     0},
+    {true, R4A_ESP32_NVM_PT_UINT8,   0,          255,           &firmwareVersionMinor,      "MinorVer",     0},
+    {true,  R4A_ESP32_NVM_PT_BOOL,   0,          1,             &otaDebug,                  "otaDebug",     0},
+    {true,  R4A_ESP32_NVM_PT_BOOL,   0,          1,             &otaDebugVerbose,           "otaVerbose",   0},
 
     // Web_Frame parameters
 // Required    Type                  Minimum     Maximum        Address                     Name            Default Value

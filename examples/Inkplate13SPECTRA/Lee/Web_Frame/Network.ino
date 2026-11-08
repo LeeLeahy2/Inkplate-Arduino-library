@@ -11,6 +11,24 @@
  **************************************************/
 
 //----------------------------------------
+// Constants
+//----------------------------------------
+
+#define OTA_DATA_TIMEOUT        (15 * MILLISECONDS_IN_A_SECOND)
+
+const char * otaEqualSigns = "==================================================";
+
+//----------------------------------------
+// Locals
+//----------------------------------------
+
+// Global variables used by firmwareUpdateProgressCallback, called by all
+// firmware update procedures
+static uint32_t firmwareUpdateBytesToProcess;
+static uint32_t firmwareUpdateBytesProcessed;
+static uint8_t firmwareUpdateLastPercent;
+
+//----------------------------------------
 // Display the CSV table
 //----------------------------------------
 void displayCsvTable(const CSV_ENTRY * csvTable, uint32_t lineCount)
@@ -540,22 +558,33 @@ bool networkReadCsvFile(SD_CARD_WRITE_CSV_FILE writeCsvFile,
     // access point SSID and password are specified
     if ((csvFileUrl == nullptr) || (csvFileUrl[0] == 0))
         Serial.printf("Enter csvFileUrl and then reboot\r\n");
+    if ((firmwareUrl == nullptr) || (firmwareUrl[0] == 0))
+        Serial.printf("Enter firmwareUrl and then reboot\r\n");
     if (count == 0)
         Serial.printf("Enter WiFi SSID and password and then reboot\r\n");
 
     // Wait for required NVM parameters
     if ((count == 0)
-        || (csvFileUrl == nullptr) || (csvFileUrl[0] == 0))
+        || (csvFileUrl == nullptr) || (csvFileUrl[0] == 0)
+        || (firmwareUrl == nullptr) || (firmwareUrl[0] == 0))
     {
         Serial.printf("Waiting for parameter entry and reboot\r\n");
         while ((count == 0)
-            || (csvFileUrl == nullptr) || (csvFileUrl[0] == 0))
+            || (csvFileUrl == nullptr) || (csvFileUrl[0] == 0)
+            || (firmwareUrl == nullptr) || (firmwareUrl[0] == 0))
         {
         }
     }
 
     // Start the network
     networkStart(count, wifiSsid, wifiPass);
+
+    // Wait for the menu system to exit
+    menuWaitExit();
+
+    // Check for firmware update
+    if (networkFirmwareUpdate(nullptr))
+        r4aEsp32SystemReset();
 
     // Attempt to open the .CSV file
     success = networkServerConnectUsingUrl(csvFileUrl,
@@ -947,4 +976,288 @@ uint32_t selectImage(uint32_t lineCount)
 {
     // Select a line in the file
     return imageNumber % lineCount;
+}
+
+// Perform the over-the-air (OTA) firmware update
+//----------------------------------------
+bool networkFirmwareUpdate(Print * display)
+{
+    bool success;
+
+    success = false;
+    if (firmwareUpdateSkip == false)
+    {
+        // Attempt to update the firmware
+        success = networkFirmwareOpenUrl(firmwareVersionMajor + 1, 0, display);
+        if (success == false)
+            success = networkFirmwareOpenUrl(firmwareVersionMajor,
+                                             firmwareVersionMinor + 1,
+                                             display);
+    }
+    return success;
+}
+
+//----------------------------------------
+// Open the firmware file
+//----------------------------------------
+bool networkFirmwareOpenUrl(uint8_t majorVer,
+                            uint8_t minorVer,
+                            Print * display)
+{
+    static uint8_t buffer[16384];
+    size_t fileBytes;
+    const char * firmwareFileExtension = ".bin";
+    String firmwareFileUrl;
+    NetworkClient * firmwareStream;
+    HTTPClient https;
+    uint8_t newVersion;
+    const char * paramMajor = "MajorVer";
+    const char * paramMinor = "MinorVer";
+    bool success;
+    char value[16];
+
+    // Determine the file names to check
+    firmwareFileUrl = String(firmwareUrl) + String("_") + String(majorVer)
+                    + String("_") + String(minorVer) + String(firmwareFileExtension);
+
+    // Display the file names
+    Serial.printf("Firmware: %s\r\n", firmwareFileUrl.c_str());
+
+    // Attempt to open the firmware file
+    firmwareStream = nullptr;
+    success = networkServerConnectUsingUrl(firmwareFileUrl.c_str(),
+                                           firmwareStream,
+                                           https,
+                                           fileBytes);
+
+    // Update the firmware if it is available
+    if (success)
+    {
+        success = otaEsp32StreamFirmware("SOC",
+                                         "ESP32S3",
+                                         firmwareStream,
+                                         fileBytes,
+                                         buffer,
+                                         sizeof(buffer));
+        if (success)
+        {
+            // Update the parameters
+            if (firmwareVersionMajor != majorVer)
+            {
+                newVersion = majorVer;
+                if (r4aEsp32NvmSetUint8Parameter(paramMajor, newVersion, display) == false)
+                    // Disable further firmware updates
+                    firmwareUpdateSkip = true;
+            }
+            if (firmwareVersionMinor != minorVer)
+            {
+                newVersion = minorVer;
+                if (r4aEsp32NvmSetUint8Parameter(paramMinor, newVersion, display) == false)
+                    // Disable further firmware updates
+                    firmwareUpdateSkip = true;
+            }
+        }
+    }
+    https.end();
+    return success;
+}
+
+//----------------------------------------
+// Reads packetBytes from an already-open HTTP stream and feeds them to the device,
+// reporting progress as it goes.
+//
+// The generic process is:
+// 1) Call the updateFirmwareBegin function to erase the flash on the device
+// 2) Call firmwareUpdateProgressReset to initialize the progress bar and set
+//    the file size
+// 3) Loop reading firmware from the stream and writing it to the device, call
+//    firmwareUpdateProgressCallback to update the progress bar
+// 4) Call the updateFirmwareEnd function to complete the flash write operation
+// 5) Display any error message
+// 6) Return the flash update success status (true/false) to the flash update
+//    routine
+// 7) The flash update routine display the final flash update operation status
+//----------------------------------------
+bool otaEsp32StreamFirmware(const char * subsystem,
+                            const char * chip,
+                            NetworkClient * stream,
+                            size_t fileBytes,
+                            uint8_t * buffer,
+                            size_t packetBytes)
+{
+    size_t remainingBytes;
+    bool success;
+
+    do
+    {
+        success = false;
+        remainingBytes = fileBytes;
+
+        // Display the parameters
+        if (otaDebug && otaDebugVerbose)
+        {
+            Serial.printf("fileBytes: %d\r\n", fileBytes);
+            Serial.printf("packetBytes: %d\r\n", packetBytes);
+        }
+
+        Serial.printf("%s (%s) entering bootloader mode...\r\n", subsystem, chip);
+
+        // Enter the bootloader and erase flash
+        if (Update.begin(fileBytes) == false)
+        {
+            Serial.printf("%s (%s) failed to enter bootloader mode.\r\n", subsystem, chip);
+            break;
+        }
+        Serial.printf("%s (%s) is in bootloader mode.\r\n", subsystem, chip);
+
+        // Initialize the progress bar
+        firmwareUpdateProgressReset(fileBytes);
+
+        // Loop until all data has been transferred or another error occurs.
+        // HTTPS conections remain open even after the data has been transferred
+        // and HTTP connections close after data has been transferred but some
+        // may still be available.  Only test the network connection when no
+        // data is available.
+        unsigned long lastDataTime = millis();
+        size_t validData = 0;
+        while (remainingBytes > 0)
+        {
+            // Wait until some data is available
+            size_t availableBytes = stream->available();
+            if (availableBytes == 0)
+            {
+                // Verify network connection
+                if (stream->connected() == false)
+                {
+                    Serial.println("ERROR: lost connection to network server");
+                    break;
+                }
+
+                // Check for network timeout
+                if ((millis() - lastDataTime) > OTA_DATA_TIMEOUT)
+                {
+                    Serial.println("ERROR: Timed out waiting for data");
+                    break;
+                }
+                yield();
+                continue;
+            }
+            if (otaDebug && otaDebugVerbose)
+                Serial.printf("availableBytes: %d\r\n", availableBytes);
+
+            // Read the received data
+            size_t bytesToRead = min(availableBytes, packetBytes - validData);
+            int bytesRead = stream->readBytes(&buffer[validData], bytesToRead);
+            if (otaDebug && otaDebugVerbose)
+                Serial.printf("bytesRead: %d\r\n", bytesRead);
+            if (bytesRead <= 0)
+            {
+                Serial.println("ERROR: Failed reading data from network");
+                break;
+            }
+            validData += bytesRead;
+
+            // Fill the packet
+            if ((validData < packetBytes) && (validData != remainingBytes))
+                continue;
+
+            // Update this portion of the firmware
+            if (Update.write(buffer, validData) != validData)
+            {
+                Serial.println("ERROR: Failed during write");
+                break;
+            }
+
+            // Display the progress
+            firmwareUpdateProgressCallback(subsystem, chip, validData);
+
+            // Account for this data
+            remainingBytes -= validData;
+            lastDataTime = millis();
+            validData = 0;
+        }
+        if (remainingBytes)
+            break;
+
+        // Notify the bootloader that the flash image is uploaded
+        if (Update.end() == false)
+        {
+            Serial.printf("ERROR: %s update.end failed. Error #: %s\r\n",
+                          chip, String(Update.getError()).c_str());
+            break;
+        }
+
+        if (Update.isFinished() == false)
+        {
+            Serial.printf("ERROR: %s (%s) update not finished? Something went wrong!\r\n", subsystem, chip);
+            break;
+        }
+
+        success = true;
+    } while (0);
+
+    // Display the number of bytes remaining
+    if (remainingBytes && otaDebug)
+        Serial.printf("remainingBytes: %d\r\n", remainingBytes);
+
+    // Display the firmware update status
+    Serial.println(otaEqualSigns);
+    if (success)
+        Serial.printf("%s (%s) firmware update completed successfully\r\n", subsystem, chip);
+    else
+        Serial.printf("%s (%s) firmware update failed!\r\n", subsystem, chip);
+    Serial.println(otaEqualSigns);
+
+    return success;
+}
+
+//----------------------------------------
+// Callback for all firmware update targets. Called with the number of
+// bytes just written to flash. Used to track and print progress.
+//----------------------------------------
+void firmwareUpdateProgressCallback(const char * subsystem,
+                                    const char * chip,
+                                    uint16_t bytesProcessed)
+{
+    const uint8_t progressBarWidth = 20;
+
+    firmwareUpdateBytesProcessed += bytesProcessed;
+
+    uint32_t progressPercent = 0;
+    if (firmwareUpdateBytesToProcess > 0)
+        progressPercent = (firmwareUpdateBytesProcessed * 100UL) / firmwareUpdateBytesToProcess;
+
+    if (progressPercent > 100)
+        progressPercent = 100;
+
+    uint8_t filled = (progressPercent * progressBarWidth) / 100;
+
+    // Don't update unless there is a change
+    if (progressPercent == firmwareUpdateLastPercent)
+        return;
+
+    firmwareUpdateLastPercent = progressPercent;
+
+    Serial.printf("%s (%s) Update Progress: [", subsystem, chip);
+
+    for (uint8_t i = 0; i < progressBarWidth; i++)
+        Serial.write(i < filled ? '#' : '-');
+
+    Serial.print("] ");
+    Serial.print(progressPercent);
+    Serial.println("%");
+}
+
+//----------------------------------------
+// Resets the progress-bar state. Must be called once at the start of each
+// firmware update - these otherwise carry over from the previous update
+// (bytesProcessed and lastPercent both already at their prior-run end
+// values), which suppresses every progress print on a second run since
+// percent is already 100 and "unchanged".
+//----------------------------------------
+void firmwareUpdateProgressReset(size_t fileBytes)
+{
+    firmwareUpdateBytesToProcess = fileBytes;
+    firmwareUpdateBytesProcessed = 0;
+    firmwareUpdateLastPercent = 0;
 }
