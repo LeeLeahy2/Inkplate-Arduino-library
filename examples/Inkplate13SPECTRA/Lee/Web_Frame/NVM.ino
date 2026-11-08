@@ -2140,3 +2140,37 @@ bool r4aEsp32s3IsAddressPeripheralRegister(void * addr)
 {
     return ((addr >= (void *)0x60000000) && (addr <= (void *)0x600fbfff));
 }
+
+//----------------------------------------
+// Set a uint8_t parameter value
+//----------------------------------------
+bool r4aEsp32NvmSetUint8Parameter(const char * name, uint8_t value, Print * display)
+{
+    const R4A_ESP32_NVM_PARAMETER * parameter;
+    bool success;
+    char valueString[16];
+
+    success = false;
+    sprintf(valueString, "%d", value);
+    parameter = r4aEsp32NvmParameterLookup(nvmParameters,
+                                           nvmParameterCount,
+                                           name,
+                                           display);
+    if (!parameter)
+        // Unknown parameter
+        Serial.printf("WARNING: %s is not a parameter!\r\n", name);
+    else
+    {
+        // Update the major version
+        if (r4aEsp32NvmParameterSet(parameterFilePath,
+                                    nvmParameters,
+                                    nvmParameterCount,
+                                    parameter,
+                                    valueString,
+                                    display))
+            success = true;
+        else
+            Serial.printf("ERROR: Failed to set parameter %s to %s!\r\n", name, valueString);
+    }
+    return success;
+}
