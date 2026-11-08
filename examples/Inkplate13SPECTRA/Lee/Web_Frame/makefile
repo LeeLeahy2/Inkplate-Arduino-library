@@ -18,7 +18,7 @@ ARCHITECTURE=esp32
 BOARD_NAME=Inkplate13SPECTRA
 BOARD_FQBN=$(VENDOR):$(ARCHITECTURE):$(BOARD_NAME)
 BOARD_PATH=$(VENDOR).$(ARCHITECTURE).$(BOARD_NAME)
-PARTITION_FILE_NAME=huge_app
+PARTITION_FILE_NAME=custom
 
 ESP_CORE_VERSION=3.2.0
 ESPTOOL_VERSION=4.9.dev3
@@ -83,6 +83,7 @@ CLEAR=clear
 COPY=cp
 DELETE=rmdir /s
 DIR_LISTING=ls
+PYTHON=python
 TERMINAL_APP=minicom
 
 TERMINAL_PORT=COM3
@@ -106,6 +107,7 @@ BOOT_LOADER_PATH=$(BUILD_PATH)$(BOARD_PATH)/
 HOME_BOARD_PATH=$(USER_DIRECTORY_PATH).arduino15/packages/esp32/
 ESP_IDF_PATH=$(HOME_BOARD_PATH)tools/esp32-arduino-libs/$(IDF_VERSION)/
 ESPTOOL_PATH=$(USER_DIRECTORY_PATH).arduino15/packages/esp32/tools/esptool_py/$(ESPTOOL_VERSION)/
+GEN_ESP32PART_PATH=$(USER_DIRECTORY_PATH).arduino15/packages/esp32/hardware/esp32/$(ESP_CORE_VERSION)/tools/gen_esp32part.py
 
 # Linux utilities
 ARDUINO_CLI=$(USER_DIRECTORY_PATH)Arduino/arduino-cli
@@ -114,6 +116,8 @@ COPY=cp
 DELETE=rm -Rf
 DIR_LISTING=ls
 TERMINAL_APP=minicom
+
+DEV_NULL=/dev/null
 
 TERMINAL_PORT=/dev/ttyUSB0
 TERMINAL_PARAMS=-b 115200   -8   --wrap   < /dev/tty
@@ -171,9 +175,10 @@ core-update:
 #DEBUG_LEVEL=error
 DEBUG_LEVEL=none
 
-$(BIN_FILE):	$(SKETCH).ino   *.ino   *.h   makefile
+$(BIN_FILE):	$(SKETCH).ino   *.ino   *.h   *.csv   makefile
 	@$(CLEAR)
 	@echo "------------------------- $(OS_NAME) ---------------------------------------------"
+	$(PYTHON)   $(GEN_ESP32PART_PATH)   partitions.csv   $(DEV_NULL)
 	@echo Building $(SKETCH) for $(BOARD_PATH)
 	$(ARDUINO_CLI)  \
 		compile  \
@@ -201,10 +206,10 @@ upload:	$(BIN_FILE)
 		--flash_freq 80m \
 		--flash_size detect \
 		--compress \
-		      0   $(BOOT_LOADER_PATH)$(SKETCH).ino.bootloader.bin \
-		 0x8000   $(BOOT_LOADER_PATH)$(SKETCH).ino.partitions.bin \
-		 0xe000   $(BOOT_APP0_PATH)boot_app0.bin \
-		0x10000   $<
+		        0   $(BOOT_LOADER_PATH)$(SKETCH).ino.bootloader.bin \
+		   0x8000   $(BOOT_LOADER_PATH)$(SKETCH).ino.partitions.bin \
+		   0xe000   $(BOOT_APP0_PATH)boot_app0.bin \
+		  0x10000   $<
 	$(TERMINAL_APP) -D $(TERMINAL_PORT) $(TERMINAL_PARAMS)
 
 ##########
