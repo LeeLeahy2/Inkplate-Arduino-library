@@ -30,6 +30,49 @@ const char * r4aEsp32NvmTypeTable[] =
     "const char *", // 12
 };
 
+typedef struct _MEMORY_MAP_ENTRY
+{
+    const char * _name;
+    uint32_t _startAddress;
+    uint32_t _endAddress;
+    bool _sram;
+    bool _ram;
+    bool _rom;
+    bool _dma;
+    bool _rtc;
+    bool _fastRtc;
+    bool _slowRtc;
+    bool _peripheral;
+    bool _eeprom;
+    bool _psram;
+    bool _sram0;
+    bool _sram1;
+    bool _sram2;
+} MEMORY_MAP_ENTRY;
+
+const MEMORY_MAP_ENTRY memoryMap[] =
+{
+    // Data bus access
+    // Name         Start       End           SRAM RAM ROM DMA RTC Fas Slo Per EEP PSR SR0 SR1 SR2
+    {"PSRAM",       0x37000000, 0x3bffffff,     0,  1,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0},
+    {"EEPROM",      0x3f400000, 0x3f7fffff,     0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0}, // Flash
+    {"SRAM1",       0x3fc80000, 0x3fc9ffff,     1,  1,  0,  1,  0,  0,  0,  0,  0,  0,  0,  1,  0},
+    {"SRAM2",       0x3fcae000, 0x3fcdffff,     1,  1,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  1},
+    {"ROM",         0x3ff00000, 0x3ff0ffff,     0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0},
+
+    // Instruction bus access
+    {"ROM",         0x40000000, 0x4005ffff,     0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0},
+    {"RTC Fast",    0x40070000, 0x40071fff,     0,  1,  0,  0,  1,  1,  0,  0,  0,  0,  0,  0,  0},
+    {"SRAM0",       0x40370000, 0x4039ffff,     1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0},
+    {"SRAM1",       0x403a0000, 0x403bffff,     1,  1,  0,  1,  0,  0,  0,  0,  0,  0,  0,  1,  0},
+    {"PSRAM",       0x44000000, 0x47ffffff,     0,  1,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0},
+
+    {"RTC Slow",    0x50000000, 0x50001fff,     0,  0,  0,  0,  1,  0,  1,  0,  0,  0,  0,  0,  0}, // PRO_CPU only
+    {"Peripheral",  0x60000000, 0x600fbfff,     0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0},
+    {"RTC Fast",    0x600fc000, 0x600fdfff,     0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0},
+};
+const int memoryMapEntries = sizeof(memoryMap) / sizeof(memoryMap[0]);
+
 //****************************************
 // Globals
 //****************************************
@@ -2046,99 +2089,191 @@ void r4aEsp32SystemReset()
 }
 
 //*********************************************************************
+// Determine the name of the memory region
+const char * r4aEsp32s3GetMemoryRegionName(void * addr)
+{
+    for (int i = 0; i < memoryMapEntries; i++)
+        if ((memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return memoryMap[i]._name;
+        }
+    return "Unknown";
+}
+
+//*********************************************************************
 // Determine if the address is SRAM that supports DMA
 bool r4aEsp32s3IsAddressInDMARAM(void * addr)
 {
-    return r4aEsp32s3IsAddressInSRAM1(addr) || r4aEsp32s3IsAddressInSRAM2(addr);
+    for (int i = 0; i < memoryMapEntries; i++)
+    {
+        if (memoryMap[i]._dma
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is in the EEPROM (Flash)
 bool r4aEsp32s3IsAddressInEEPROM(void * addr)
 {
-    return ((addr >= (void *)0x3f400000) && (addr <= (void *)0x3f7fffff));
+    for (int i = 0; i < memoryMapEntries; i++)
+        if (memoryMap[i]._eeprom
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is in PSRAM (SPI RAM)
 bool r4aEsp32s3IsAddressInPSRAM(void * addr)
 {
-    return (((addr >= (void *)0x37000000) && (addr <= (void *)0x3bffffff))
-        || ((addr >= (void *)0x44000000) && (addr <= (void *)0x47ffffff)));
+    for (int i = 0; i < memoryMapEntries; i++)
+        if (memoryMap[i]._psram
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is in PSRAM, SRAM or RTC fast memory
 bool r4aEsp32s3IsAddressInRAM(void * addr)
 {
-    return r4aEsp32s3IsAddressInSRAM(addr) || r4aEsp32s3IsAddressInPSRAM(addr)
-        || r4aEsp32s3IsAddressInRtcFastMemory(addr);
+    for (int i = 0; i < memoryMapEntries; i++)
+    {
+        if (memoryMap[i]._ram
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 //*********************************************************************
 bool r4aEsp32s3IsAddressInROM(void * addr)
 {
-    return (((addr >= (void *)0x3ff00000) && (addr <= (void *)0x3ff0ffff))
-        ||  ((addr >= (void *)0x40000000) && (addr <= (void *)0x4005ffff)));
+    for (int i = 0; i < memoryMapEntries; i++)
+    {
+        if (memoryMap[i]._rom
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is in RTC fast memory
 bool r4aEsp32s3IsAddressInRtcFastMemory(void * addr)
 {
-    // Instruction bus addresses, PRO_CPU only, see pages 28-29 in the TRM
-    return (xPortGetCoreID() == 0)
-        && (((addr >= (void *)0x40070000) && (addr <= (void *)0x40071fff))
-            || ((addr >= (void *)0x600fc0000) && (addr <= (void *)0x600fdfff)));
+    for (int i = 0; i < memoryMapEntries; i++)
+        if (memoryMap[i]._fastRtc
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is in RTC slow memory
 bool r4aEsp32s3IsAddressInRtcSlowMemory(void * addr)
 {
-    // Instruction bus addresses, PRO_CPU only, see pages 28-29 in the TRM
-    return (xPortGetCoreID() == 0)
-        && ((addr >= (void *)0x50000000) && (addr <= (void *)0x50001fff));
+    for (int i = 0; i < memoryMapEntries; i++)
+        if (memoryMap[i]._slowRtc
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is in SRAM
 bool r4aEsp32s3IsAddressInSRAM(void * addr)
 {
-    return r4aEsp32s3IsAddressInSRAM0(addr) || r4aEsp32s3IsAddressInSRAM1(addr)
-        || r4aEsp32s3IsAddressInSRAM2(addr);
+    for (int i = 0; i < memoryMapEntries; i++)
+    {
+        if (memoryMap[i]._sram
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is in SRAM0
 bool r4aEsp32s3IsAddressInSRAM0(void * addr)
 {
-    // Instruction bus addresses
-    return ((addr >= (void *)0x40370000) && (addr <= (void *)0x4039ffff));
+    for (int i = 0; i < memoryMapEntries; i++)
+        if (memoryMap[i]._sram0
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is in SRAM1
 bool r4aEsp32s3IsAddressInSRAM1(void * addr)
 {
-    // Data bus addresses
-    return ((addr >= (void *)0x3fc80000) && (addr <= (void *)0x3fc9ffff))
-        // Instruction bus addresses
-        || ((addr >= (void *)0x403a0000) && (addr <= (void *)0x403bffff));
+    for (int i = 0; i < memoryMapEntries; i++)
+        if (memoryMap[i]._sram1
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is in SRAM2
 bool r4aEsp32s3IsAddressInSRAM2(void * addr)
 {
-    return ((addr >= (void *)0x3fcae000) && (addr <= (void *)0x3fcdffff));
+    for (int i = 0; i < memoryMapEntries; i++)
+        if (memoryMap[i]._sram2
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    return false;
 }
 
 //*********************************************************************
 // Determine if the address is a peripheral register
 bool r4aEsp32s3IsAddressPeripheralRegister(void * addr)
 {
-    return ((addr >= (void *)0x60000000) && (addr <= (void *)0x600fbfff));
+    for (int i = 0; i < memoryMapEntries; i++)
+        if (memoryMap[i]._peripheral
+            && (memoryMap[i]._startAddress <= (uintptr_t)addr)
+            && (memoryMap[i]._endAddress >= (uintptr_t)addr))
+        {
+            return true;
+        }
+    return false;
 }
 
 //----------------------------------------
